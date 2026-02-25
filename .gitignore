@@ -1,0 +1,42 @@
+# generated
+node_modules/
+dist/
+build/
+.output/
+stdb/target/
+coverage/
+.nyc_output/
+*.log
+npm-debug.log*
+tmp/
+temp/
+*.tmp
+src/index.js
+src/index.js.map
+
+# local env and secrets
+.env
+.env.local
+.env.*.local
+wallets/
+tokens/
+secrets/
+*.pem
+*.key
+
+# databases
+*.sqlite
+*.sqlite3
+*.db
+
+# misc
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# build artifacts
+*.tsbuildinfo
+backend-deno/sdk/

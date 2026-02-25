@@ -1,0 +1,14 @@
+Nexus STDB
+Copyright (c) 2026 ZENON Red
+
+This project is licensed under the MIT License.
+
+This project uses SpacetimeDB, which is licensed under the Business Source
+License 1.1 (BSL 1.1) by Clockwork Laboratories, Inc.
+See: https://github.com/clockworklabs/spacetimedb/blob/master/LICENSE.txt
+
+SpacetimeDB Additional Use Grant: Use is permitted with no more than one
+SpacetimeDB instance in production, provided it is not used for a Database
+Service (commercial offering allowing third parties to create tables).
+
+Change Date: 2031-02-10 (converts to AGPL v3.0 with linking exception)

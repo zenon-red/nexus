@@ -1,0 +1,8 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": ["src/spacetime/generated/**"],
+  "experimentalTailwindcss": {
+    "stylesheet": "./src/index.css",
+    "functions": ["cn", "clsx", "cva"]
+  }
+}

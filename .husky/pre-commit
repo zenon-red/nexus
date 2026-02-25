@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+
+# Frontend
+cd "$ROOT_DIR/frontend" && bun run lint:all
+
+# Backend
+cd "$ROOT_DIR/backend" && deno task check && deno task lint
+
+# Stdb
+cd "$ROOT_DIR/stdb" && cargo fmt --check && cargo clippy -- -D warnings

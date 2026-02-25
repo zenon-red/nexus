@@ -1,0 +1,49 @@
+name: Deploy Backend to Deno Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: nexus
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v2.0.3
+        with:
+          deno-version: v2.x
+
+      - name: Setup Node
+        uses: actions/setup-node@v6.2.0
+        with:
+          node-version: 22
+
+      - name: Build znn sdk
+        working-directory: backend/znn-typescript-sdk
+        run: npm ci && npm run build
+
+      - name: Check
+        working-directory: backend
+        run: deno task check
+
+      - name: Test
+        working-directory: backend
+        run: deno task test
+
+      - name: Deploy to Deno Deploy
+        working-directory: backend
+        run: deno deploy --prod --token "${{ secrets.DENO_DEPLOY_TOKEN }}"

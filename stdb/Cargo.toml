@@ -1,0 +1,17 @@
+[package]
+name = "nexus"
+description = "SpacetimeDB module for the Nexus orchestration layer."
+version = "0.1.0"
+edition = "2024"
+publish = false
+rust-version = "1.85"
+repository = "https://github.com/zenon-red/nexus"
+homepage = "https://zenon.red"
+license = "MIT"
+
+[dependencies]
+spacetimedb = "2.0.1"
+log = "0.4"
+
+[lib]
+crate-type = ["cdylib"]
