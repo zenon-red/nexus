@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+
+# Backend tests
+cd backend && deno task test
+
+# Stdb tests
+cd ../stdb && cargo test

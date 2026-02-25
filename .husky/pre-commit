@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+
+# Frontend
+cd frontend && npm run lint:all
+
+# Backend
+cd ../backend && deno task check && deno task lint
+
+# Stdb
+cd ../stdb && cargo fmt --check && cargo clippy -- -D warnings
