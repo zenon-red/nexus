@@ -10,7 +10,7 @@ homepage = "https://zenon.red"
 license = "MIT"
 
 [dependencies]
-spacetimedb = "2.0.1"
+spacetimedb = "2.0.4"
 log = "0.4"
 
 [lib]
