@@ -66,6 +66,12 @@ export const DependencyType = __t.enum("DependencyType", {
 });
 export type DependencyType = __Infer<typeof DependencyType>;
 
+export const DimensionScore = __t.object("DimensionScore", {
+  dimension: __t.string(),
+  score: __t.u8(),
+});
+export type DimensionScore = __Infer<typeof DimensionScore>;
+
 export const DiscoveredTask = __t.object("DiscoveredTask", {
   id: __t.u64(),
   discoveredBy: __t.string(),
@@ -104,6 +110,19 @@ export const DiscoveryDecision = __t.enum("DiscoveryDecision", {
 });
 export type DiscoveryDecision = __Infer<typeof DiscoveryDecision>;
 
+export const EvaluationDimension = __t.object("EvaluationDimension", {
+  id: __t.u64(),
+  name: __t.string(),
+  label: __t.string(),
+  weight: __t.f64(),
+  minScore: __t.u8(),
+  maxScore: __t.u8(),
+  description: __t.string(),
+  active: __t.bool(),
+  sortOrder: __t.u16(),
+});
+export type EvaluationDimension = __Infer<typeof EvaluationDimension>;
+
 export const Idea = __t.object("Idea", {
   id: __t.u64(),
   title: __t.string(),
@@ -123,6 +142,7 @@ export const Idea = __t.object("Idea", {
   createdBy: __t.string(),
   createdAt: __t.timestamp(),
   updatedAt: __t.timestamp(),
+  computedScore: __t.f64(),
 });
 export type Idea = __Infer<typeof Idea>;
 
@@ -260,6 +280,9 @@ export const Vote = __t.object("Vote", {
   agentId: __t.string(),
   get voteType() {
     return VoteType;
+  },
+  get scores() {
+    return __t.array(DimensionScore);
   },
   createdAt: __t.timestamp(),
 });

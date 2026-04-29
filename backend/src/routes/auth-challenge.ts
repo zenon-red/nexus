@@ -1,4 +1,3 @@
-import { CHALLENGE_TTL, ISSUER_URL } from "../config.ts";
 import { parseJsonBody, getStringField } from "../http.ts";
 import { validateZenonAddress } from "../zenon.ts";
 import type { RouteContext } from "./context.ts";
@@ -26,7 +25,7 @@ export async function handleAuthChallenge(req: Request, ctx: RouteContext): Prom
   }
 
   const nonce = crypto.randomUUID();
-  const challenge = `Sign to authenticate with ${ISSUER_URL}: ${nonce}`;
+  const challenge = `Sign to authenticate with ${ctx.config.issuerUrl}: ${nonce}`;
   const now = Math.floor(Date.now() / 1000);
 
   await ctx.challengeStore.store(nonce, {
@@ -34,12 +33,12 @@ export async function handleAuthChallenge(req: Request, ctx: RouteContext): Prom
     address,
     challenge,
     createdAt: now,
-    expiresAt: now + CHALLENGE_TTL,
+    expiresAt: now + ctx.config.challengeTtl,
   });
 
   return Response.json({
     nonce,
     challenge,
-    expires_at: now + CHALLENGE_TTL,
+    expires_at: now + ctx.config.challengeTtl,
   }, { headers: ctx.headers });
 }

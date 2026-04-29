@@ -44,6 +44,7 @@ pub fn propose_idea(
         created_by: agent.id.clone(),
         created_at: ctx.timestamp,
         updated_at: ctx.timestamp,
+        computed_score: 0.0,
     });
 
     update_agent_activity(ctx, agent)?;

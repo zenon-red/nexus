@@ -1,8 +1,13 @@
 use spacetimedb::{Timestamp, table};
 
-use crate::types::VoteType;
+use crate::types::{DimensionScore, VoteType};
 
-#[table(accessor = votes, public, index(accessor = by_idea_agent, btree(columns = [idea_id, agent_id])))]
+#[table(
+    accessor = votes,
+    public,
+    index(accessor = by_idea, btree(columns = [idea_id])),
+    index(accessor = by_idea_agent, btree(columns = [idea_id, agent_id]))
+)]
 pub struct Vote {
     #[primary_key]
     #[auto_inc]
@@ -10,5 +15,6 @@ pub struct Vote {
     pub idea_id: u64,
     pub agent_id: String,
     pub vote_type: VoteType,
+    pub scores: Vec<DimensionScore>,
     pub created_at: Timestamp,
 }

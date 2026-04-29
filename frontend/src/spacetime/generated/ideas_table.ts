@@ -33,4 +33,5 @@ export default __t.row({
   createdBy: __t.string().name("created_by"),
   createdAt: __t.timestamp().name("created_at"),
   updatedAt: __t.timestamp().name("updated_at"),
+  computedScore: __t.f64().name("computed_score"),
 });

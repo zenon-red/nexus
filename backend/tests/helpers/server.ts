@@ -1,9 +1,11 @@
 import { assert } from "@std/assert";
+import { loadConfig } from "../../src/config.ts";
 
 export interface TestServer {
   apiUrl: string;
   server: Deno.HttpServer<Deno.NetAddr>;
   kv: Deno.Kv;
+  kvPath: string;
 }
 
 function toPem(type: "PUBLIC KEY" | "PRIVATE KEY", data: ArrayBuffer): string {
@@ -43,7 +45,11 @@ async function waitForHealth(url: string): Promise<void> {
   throw new Error("Test server did not become healthy in time");
 }
 
-export async function startTestServer(): Promise<TestServer> {
+export interface TestServerOptions {
+  rateLimitRequests?: number;
+}
+
+export async function startTestServer(options?: TestServerOptions): Promise<TestServer> {
   const { privatePem, publicPem } = await generateJwtKeyPair();
 
   Deno.env.set("JWT_PRIVATE_KEY", privatePem);
@@ -51,7 +57,7 @@ export async function startTestServer(): Promise<TestServer> {
   Deno.env.set("JWT_KEY_ID", "test-key-id");
   Deno.env.set("TOKEN_TTL", "3600");
   Deno.env.set("CHALLENGE_TTL", "300");
-  Deno.env.set("RATE_LIMIT_REQUESTS", "10");
+  Deno.env.set("RATE_LIMIT_REQUESTS", "1000");
   Deno.env.set("RATE_LIMIT_WINDOW", "60");
   Deno.env.set("TRUST_PROXY", "false");
   Deno.env.set("CORS_ORIGIN", "*");
@@ -64,17 +70,29 @@ export async function startTestServer(): Promise<TestServer> {
   const apiUrl = `http://${addr.hostname}:${addr.port}`;
 
   Deno.env.set("ISSUER_URL", apiUrl);
+  const config = loadConfig();
 
-  const kv = await Deno.openKv();
+  const kvPath = await Deno.makeTempFile({ suffix: ".kv" });
+  const kv = await Deno.openKv(kvPath);
   const { createHandler } = await import("../../src/handler.ts");
-  const server = Deno.serve({ hostname: addr.hostname, port: addr.port }, createHandler(kv));
+  const server = Deno.serve(
+    { hostname: addr.hostname, port: addr.port },
+    createHandler(kv, { config, rateLimitRequests: options?.rateLimitRequests }),
+  );
 
   await waitForHealth(apiUrl);
 
-  return { apiUrl, server, kv };
+  return { apiUrl, server, kv, kvPath };
 }
 
 export async function stopTestServer(testServer: TestServer | null): Promise<void> {
   await testServer?.server.shutdown();
   testServer?.kv.close();
+  if (testServer?.kvPath) {
+    try {
+      await Deno.remove(testServer.kvPath);
+    } catch {
+      // ignore cleanup errors
+    }
+  }
 }

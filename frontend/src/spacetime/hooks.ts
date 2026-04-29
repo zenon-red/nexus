@@ -7,6 +7,7 @@ import type {
   AgentStatus,
   Channel,
   DiscoveredTask,
+  EvaluationDimension,
   Idea,
   IdeaStatus,
   IdentityRole,
@@ -30,6 +31,7 @@ export type {
   Message as MessagesRow,
   Project as ProjectsRow,
   Vote as VotesRow,
+  EvaluationDimension as EvaluationDimensionRow,
   IdentityRole as IdentityRolesRow,
   DiscoveredTask as DiscoveredTasksRow,
   ProjectChannel as ProjectChannelsRow,
@@ -44,6 +46,7 @@ export type {
   AgentStatus,
   MessageType,
   ProjectStatus,
+  EvaluationDimension,
 };
 
 export function useIdeas() {
@@ -125,6 +128,11 @@ export function useIdentityRoles() {
 export function useDiscoveredTasks() {
   const [rows] = useTable(tables.discovered_tasks);
   return useMemo(() => [...rows] as DiscoveredTask[], [rows]);
+}
+
+export function useEvaluationDimensions() {
+  const [rows] = useTable(tables.evaluation_dimensions);
+  return useMemo(() => [...rows] as EvaluationDimension[], [rows]);
 }
 
 export function useProjectChannels() {

@@ -32,6 +32,7 @@ type EventType =
   | "project_message"
   | "vote_up"
   | "vote_down"
+  | "vote_veto"
   | "task_completed"
   | "task_assigned"
   | "idea_proposed"
@@ -43,6 +44,7 @@ const expressionConfig: Record<EventType, Expression> = {
   project_message: "zoe_open_mouth",
   vote_up: "zoe_wink_star",
   vote_down: "zoe_mad",
+  vote_veto: "zoe_disgusted",
   task_completed: "zoe_grin",
   task_assigned: "zoe_hands_right",
   idea_proposed: "zoe_blushing",
@@ -110,10 +112,15 @@ export function TalkingHead({ showWordmark = true }: TalkingHeadProps) {
     });
 
     votes.forEach((vote) => {
-      setLatest(
-        VoteTypeEnum.is.up(vote.voteType) ? "vote_up" : "vote_down",
-        Number(vote.createdAt.microsSinceUnixEpoch),
-      );
+      let type: EventType;
+      if (VoteTypeEnum.is.up(vote.voteType)) {
+        type = "vote_up";
+      } else if (VoteTypeEnum.is.veto(vote.voteType)) {
+        type = "vote_veto";
+      } else {
+        type = "vote_down";
+      }
+      setLatest(type, Number(vote.createdAt.microsSinceUnixEpoch));
     });
 
     tasks.forEach((task) => {

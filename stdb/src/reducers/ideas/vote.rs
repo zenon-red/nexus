@@ -1,14 +1,83 @@
+use std::collections::HashSet;
+
 use spacetimedb::{ReducerContext, Table, reducer};
 
 use crate::helpers::activity::update_agent_activity;
+use crate::helpers::scoring::{compute_idea_score, derive_vote_type, get_approval_threshold};
 use crate::reducers::messaging::send::send_system_message;
 use crate::tables::agent::agents;
+use crate::tables::evaluation_dimension::{EvaluationDimension, evaluation_dimensions};
 use crate::tables::idea::{Idea, ideas};
 use crate::tables::vote::{Vote, votes};
-use crate::types::{IdeaStatus, VoteType};
+use crate::types::{DimensionScore, IdeaStatus, VoteType};
+
+fn validate_scores(
+    scores: &[DimensionScore],
+    active_dimensions: &[EvaluationDimension],
+) -> Result<(), String> {
+    if scores.is_empty() {
+        return Err("Scores cannot be empty; submit dimension scores to vote".to_string());
+    }
+
+    if active_dimensions.is_empty() {
+        return Err("No active evaluation dimensions configured".to_string());
+    }
+
+    let mut seen = HashSet::new();
+    for score in scores {
+        if !seen.insert(score.dimension.as_str()) {
+            return Err(format!(
+                "Duplicate dimension '{}'; each dimension scored once",
+                score.dimension
+            ));
+        }
+
+        let dim = active_dimensions
+            .iter()
+            .find(|d| d.name == score.dimension)
+            .ok_or_else(|| {
+                format!(
+                    "Dimension '{}' is not active or does not exist",
+                    score.dimension
+                )
+            })?;
+
+        if score.score < dim.min_score || score.score > dim.max_score {
+            return Err(format!(
+                "Score {} for dimension '{}' is outside range {}-{}",
+                score.score, score.dimension, dim.min_score, dim.max_score
+            ));
+        }
+    }
+
+    let missing_dimensions: Vec<String> = active_dimensions
+        .iter()
+        .filter(|dimension| !seen.contains(dimension.name.as_str()))
+        .map(|dimension| dimension.name.clone())
+        .collect();
+
+    if !missing_dimensions.is_empty() {
+        let required = active_dimensions
+            .iter()
+            .map(|d| d.name.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        return Err(format!(
+            "Missing active dimension scores: {}. Required dimensions: {}",
+            missing_dimensions.join(", "),
+            required
+        ));
+    }
+
+    Ok(())
+}
 
 #[reducer]
-pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Result<(), String> {
+pub fn vote_idea(
+    ctx: &ReducerContext,
+    idea_id: u64,
+    scores: Vec<DimensionScore>,
+) -> Result<(), String> {
     let agent = ctx
         .db
         .agents()
@@ -33,11 +102,22 @@ pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Res
         return Err("Already voted".to_string());
     }
 
+    let active_dims: Vec<EvaluationDimension> = ctx
+        .db
+        .evaluation_dimensions()
+        .by_active()
+        .filter(&true)
+        .collect();
+    validate_scores(&scores, &active_dims)?;
+
+    let vote_type = derive_vote_type(ctx, &scores);
+
     ctx.db.votes().insert(Vote {
         id: 0,
         idea_id,
         agent_id: agent.id.clone(),
         vote_type: vote_type.clone(),
+        scores,
         created_at: ctx.timestamp,
     });
 
@@ -48,6 +128,8 @@ pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Res
     };
     let total_votes = idea.total_votes + 1;
 
+    let computed_score = compute_idea_score(ctx, idea_id);
+
     if veto_count >= idea.veto_threshold {
         ctx.db.ideas().id().update(Idea {
             status: IdeaStatus::Rejected,
@@ -55,6 +137,7 @@ pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Res
             down_votes,
             veto_count,
             total_votes,
+            computed_score,
             updated_at: ctx.timestamp,
             ..idea
         });
@@ -69,6 +152,7 @@ pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Res
             down_votes,
             veto_count,
             total_votes,
+            computed_score,
             updated_at: ctx.timestamp,
             ..idea
         });
@@ -76,7 +160,7 @@ pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Res
         return Ok(());
     }
 
-    if up_votes >= idea.approval_threshold {
+    if computed_score >= get_approval_threshold(ctx) {
         let idea_title = idea.title.clone();
 
         ctx.db.ideas().id().update(Idea {
@@ -85,6 +169,7 @@ pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Res
             down_votes,
             veto_count,
             total_votes,
+            computed_score,
             updated_at: ctx.timestamp,
             ..idea
         });
@@ -92,14 +177,17 @@ pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Res
 
         send_system_message(
             ctx,
-            format!("Idea '{}' approved", idea_title),
+            format!(
+                "Idea '{}' approved (score: {:.2})",
+                idea_title, computed_score
+            ),
             Some("general"),
         )?;
         send_system_message(
             ctx,
             format!(
-                "Idea '{}' approved for project creation. Review and create project when ready.",
-                idea_title
+                "Idea '{}' approved for project creation (score: {:.2}). Review and create project when ready.",
+                idea_title, computed_score
             ),
             Some("zoe"),
         )?;
@@ -107,14 +195,21 @@ pub fn vote_idea(ctx: &ReducerContext, idea_id: u64, vote_type: VoteType) -> Res
     }
 
     ctx.db.ideas().id().update(Idea {
+        status: IdeaStatus::Rejected,
         up_votes,
         down_votes,
         veto_count,
         total_votes,
+        computed_score,
         updated_at: ctx.timestamp,
         ..idea
     });
 
     update_agent_activity(ctx, agent)?;
+    send_system_message(
+        ctx,
+        format!("Idea {} rejected (score: {:.2})", idea_id, computed_score),
+        None,
+    )?;
     Ok(())
 }

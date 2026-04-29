@@ -1,15 +1,45 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate } from "react-router";
 import { m, AnimatePresence } from "motion/react";
-import { ArrowLeft, ArrowBigUp, ArrowBigDown, Octagon, FolderOpen, X } from "lucide-react";
+import { ArrowLeft, ArrowBigUp, ArrowBigDown, Octagon, FolderOpen, X, Info } from "lucide-react";
 import { AppShell } from "@/components/layout";
+import { cn } from "@/lib/utils";
 import { useIdea } from "@/hooks/useIdea";
-import { useAgents, useConnectionStatus, useIdeas } from "@/spacetime/hooks";
+import {
+  useAgents,
+  useConnectionStatus,
+  useIdeas,
+  useEvaluationDimensions,
+} from "@/spacetime/hooks";
 import { IdeaStatusEnum } from "@/spacetime/hooks";
 import { AlienAvatar } from "@zenon-red/alien-avatars-react";
 import { HumanTaskDialog } from "@/components/ui/HumanTaskDialog";
 import { CyberProgress } from "@/components/ui/CyberProgress";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/animate-ui/components/animate/tooltip";
 import type { VotesRow, AgentsRow, VoteType } from "@/spacetime/hooks";
+import type { DimensionScore } from "@/spacetime/generated/types";
+
+const APPROVAL_THRESHOLD = 7.0;
+const VETO_FLOOR = 2.0;
+const MIN_SCORE = 1;
+const MAX_SCORE = 10;
+
+function getScoreTextClass(score: number): string {
+  if (score >= APPROVAL_THRESHOLD) return "text-success";
+  if (score >= VETO_FLOOR) return "text-cyan-400";
+  return "text-destructive";
+}
+
+function getScoreProgressColor(score: number): "success" | "cyan" | "destructive" {
+  if (score >= APPROVAL_THRESHOLD) return "success";
+  if (score >= VETO_FLOOR) return "cyan";
+  return "destructive";
+}
 
 function formatTimeAgo(timestamp: { microsSinceUnixEpoch: bigint }): string {
   const now = Date.now();
@@ -29,7 +59,24 @@ function formatTimeAgo(timestamp: { microsSinceUnixEpoch: bigint }): string {
 
 function formatTimeShort(timestamp: { microsSinceUnixEpoch: bigint }): string {
   const then = new Date(Number(timestamp.microsSinceUnixEpoch / 1000n));
-  return then.toISOString().slice(11, 16);
+  const day = then.getDate();
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const month = months[then.getMonth()];
+  const time = then.toISOString().slice(11, 16);
+  return `${day} ${month} ${time}`;
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -51,14 +98,109 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
+function formatDimensionLabel(name: string): string {
+  return name
+    .split("_")
+    .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(" ");
+}
+
+function computeWeightedScore(
+  scores: DimensionScore[],
+  dimensionWeights: DimensionWeightMap,
+): number {
+  if (scores.length === 0) return 0;
+
+  let totalWeight = 0;
+  let weightedSum = 0;
+
+  for (const [name, dim] of dimensionWeights) {
+    const score = scores.find((s) => s.dimension === name);
+    const rawScore = score ? score.score : (dim.minScore + dim.maxScore) / 2;
+    const clamped = Math.max(dim.minScore, Math.min(dim.maxScore, rawScore));
+    const range = dim.maxScore - dim.minScore;
+    const normalized = range > 0 ? (clamped - dim.minScore) / range : 0;
+    weightedSum += dim.weight * normalized;
+    totalWeight += dim.weight;
+  }
+
+  if (totalWeight === 0) return 0;
+  return (weightedSum / totalWeight) * MAX_SCORE;
+}
+
+function ScoreBreakdownCard({ scores }: { scores: DimensionScore[] }) {
+  if (scores.length === 0) return null;
+
+  return (
+    <div className="min-w-64 space-y-2 p-2">
+      <div className="mb-1 pb-2 text-center font-mono text-xs tracking-normal uppercase">
+        dimension scores
+      </div>
+      {scores.map((s) => (
+        <div key={s.dimension} className="space-y-0.5">
+          <div className="flex items-center justify-between">
+            <span className="font-mono text-xs text-muted-foreground">
+              {formatDimensionLabel(s.dimension)}
+            </span>
+            <span className={cn("font-mono text-sm font-bold", getScoreTextClass(s.score))}>
+              {s.score}
+            </span>
+          </div>
+          <CyberProgress
+            value={s.score}
+            max={MAX_SCORE}
+            color={getScoreProgressColor(s.score)}
+            size="sm"
+            showPercentage={false}
+            showLabels={false}
+          />
+        </div>
+      ))}
+      <div className="pt-1 font-mono text-tiny text-muted-foreground/70">
+        Scale {MIN_SCORE}-{MAX_SCORE} / ≥{APPROVAL_THRESHOLD} approve / ≤{VETO_FLOOR} veto
+      </div>
+    </div>
+  );
+}
+
+type DimensionWeightMap = Map<string, { weight: number; minScore: number; maxScore: number }>;
+
+function ScoreCell({
+  scores,
+  dimensionWeights,
+}: {
+  scores: DimensionScore[];
+  dimensionWeights: DimensionWeightMap;
+}) {
+  const weightedScore = computeWeightedScore(scores, dimensionWeights);
+
+  return (
+    <Tooltip side="right" align="start">
+      <TooltipTrigger asChild>
+        <div className="flex w-16 shrink-0 cursor-default items-center justify-center gap-1">
+          <span className={cn("text-sm font-bold tabular-nums", getScoreTextClass(weightedScore))}>
+            {weightedScore.toFixed(1)}
+          </span>
+          <Info className="h-3 w-3 text-muted-foreground/50" />
+        </div>
+      </TooltipTrigger>
+      <TooltipContent className="rounded-lg border-success/20 bg-surface px-4 py-3 font-mono shadow-2xl shadow-success/10">
+        <ScoreBreakdownCard scores={scores} />
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
 function VoteRow({
   vote,
   voter,
   index,
+  dimensionWeights,
 }: {
   vote: VotesRow;
   voter: AgentsRow | undefined;
   index: number;
+  dimensionWeights: DimensionWeightMap;
 }) {
   const getVoteIcon = (voteType: VoteType) => {
     if (voteType.tag === "Up") {
@@ -82,18 +224,25 @@ function VoteRow({
     return "text-destructive";
   };
 
+  const getVoteTint = (voteType: VoteType) => {
+    if (voteType.tag === "Up") return "bg-linear-to-r from-success/5 to-success/10";
+    if (voteType.tag === "Down") return "bg-linear-to-r from-cyan-400/2 to-cyan-400/4";
+    return "bg-linear-to-r from-destructive/2 to-destructive/4";
+  };
+
   return (
     <m.div
       initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      className="group flex items-center gap-4 border-b border-border/20 px-5 py-4 transition-all duration-200 hover:bg-surface-elevated/30"
+      className={cn(
+        "group flex items-center gap-4 border-b border-border/20 px-5 py-4 transition-all duration-200 hover:bg-surface-elevated/30",
+        getVoteTint(vote.voteType),
+      )}
     >
-      <div className="w-20 shrink-0 text-sm font-medium text-muted-foreground">
-        {formatTimeShort(vote.createdAt)}
-      </div>
+      <ScoreCell scores={vote.scores} dimensionWeights={dimensionWeights} />
 
-      <div className="flex w-20 shrink-0 items-center gap-2">
+      <div className="flex w-20 shrink-0 items-center justify-center gap-2">
         {getVoteIcon(vote.voteType)}
         <span className={`text-xs font-bold ${getVoteColor(vote.voteType)}`}>
           {getVoteLabel(vote.voteType)}
@@ -107,6 +256,10 @@ function VoteRow({
         <span className="truncate text-base font-medium text-foreground">
           {voter?.name || vote.agentId}
         </span>
+      </div>
+
+      <div className="w-24 shrink-0 text-right text-sm font-medium text-muted-foreground">
+        {formatTimeShort(vote.createdAt)}
       </div>
     </m.div>
   );
@@ -161,6 +314,7 @@ type IdeaPageViewProps = {
   isVoting: boolean;
   sortedVotes: VotesRow[];
   voterMap: Record<string, AgentsRow>;
+  dimensionWeights: DimensionWeightMap;
   dialogOpen: boolean;
   setDialogOpen: (open: boolean) => void;
   navigate: ReturnType<typeof useNavigate>;
@@ -175,6 +329,7 @@ function IdeaPageView({
   isVoting,
   sortedVotes,
   voterMap,
+  dimensionWeights,
   dialogOpen,
   setDialogOpen,
   navigate,
@@ -263,13 +418,21 @@ function IdeaPageView({
 
         <div className="flex-1 overflow-y-auto">
           <div className="mx-auto max-w-4xl space-y-8 p-6 lg:p-8">
-            <section>
+            <section className="space-y-3">
+              <CyberProgress
+                value={idea.computedScore}
+                max={MAX_SCORE}
+                label="Score"
+                color={getScoreProgressColor(idea.computedScore)}
+                size="lg"
+                valueLabel={idea.computedScore.toFixed(1)}
+              />
               <CyberProgress
                 value={idea.totalVotes}
                 max={idea.quorum}
-                label="Quorum Progress"
-                color="primary"
-                size="lg"
+                label="Quorum"
+                color={idea.totalVotes >= idea.quorum ? "success" : "primary"}
+                size="md"
               />
             </section>
 
@@ -279,7 +442,20 @@ function IdeaPageView({
               transition={{ delay: 0.05 }}
               className="rounded-md bg-surface text-left font-mono"
             >
-              <div className="grid grid-cols-3 gap-6">
+              <div className="grid grid-cols-4 gap-4">
+                <div className="rounded-md bg-surface-elevated/20">
+                  <div className="text-center text-tiny tracking-wider text-muted-foreground uppercase">
+                    score
+                  </div>
+                  <div
+                    className={cn(
+                      "mt-1 text-center text-sm font-semibold",
+                      getScoreTextClass(idea.computedScore),
+                    )}
+                  >
+                    {idea.computedScore.toFixed(1)}
+                  </div>
+                </div>
                 <div className="rounded-md bg-surface-elevated/20">
                   <div className="text-center text-tiny tracking-wider text-muted-foreground uppercase">
                     participation
@@ -290,10 +466,10 @@ function IdeaPageView({
                 </div>
                 <div className="rounded-md bg-surface-elevated/20">
                   <div className="text-center text-tiny tracking-wider text-muted-foreground uppercase">
-                    threshold
+                    approval
                   </div>
                   <div className="mt-1 text-center text-sm font-semibold text-foreground">
-                    {idea.approvalThreshold}
+                    ≥ 7.0
                   </div>
                 </div>
                 <div className="rounded-md bg-surface-elevated/20">
@@ -399,6 +575,30 @@ function IdeaPageView({
                     <span className="text-base font-bold text-destructive">Veto</span>
                   </m.button>
                 </div>
+                <div className="mt-3 flex items-center justify-center gap-1.5 text-tiny text-muted-foreground/50">
+                  <Info className="h-3 w-3" />
+                  <span>
+                    Votes are cast via{" "}
+                    <a
+                      href="https://github.com/zenon-red/probe"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <code className="font-mono underline decoration-dotted underline-offset-2 transition-colors hover:text-muted-foreground">
+                        Probe
+                      </code>
+                    </a>{" "}
+                    using structured dimension scores.{" "}
+                    <a
+                      href="https://github.com/zenon-red/nexus/blob/main/docs/idea-evaluation.md"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline decoration-dotted underline-offset-2 transition-colors hover:text-muted-foreground"
+                    >
+                      Evaluation criteria
+                    </a>
+                  </span>
+                </div>
               </m.section>
             )}
 
@@ -442,11 +642,12 @@ function IdeaPageView({
                     No votes yet
                   </div>
                 ) : (
-                  <>
+                  <TooltipProvider>
                     <div className="flex items-center gap-4 border-b border-border bg-surface-elevated px-5 py-3 text-sm font-semibold text-muted-foreground">
-                      <div className="w-20 shrink-0">TIME</div>
-                      <div className="w-20 shrink-0">VOTE</div>
+                      <div className="w-16 shrink-0 text-center">SCORE</div>
+                      <div className="w-20 shrink-0 text-center">VOTE</div>
                       <div className="flex-1">AGENT</div>
+                      <div className="w-24 shrink-0 text-right">TIME</div>
                     </div>
 
                     <div className="divide-y divide-border/20">
@@ -457,11 +658,12 @@ function IdeaPageView({
                             vote={vote}
                             voter={voterMap[vote.agentId]}
                             index={index}
+                            dimensionWeights={dimensionWeights}
                           />
                         ))}
                       </AnimatePresence>
                     </div>
-                  </>
+                  </TooltipProvider>
                 )}
               </div>
             </section>
@@ -479,6 +681,7 @@ export function IdeaPage() {
   const navigate = useNavigate();
   const agents = useAgents();
   const ideas = useIdeas();
+  const dimensions = useEvaluationDimensions();
   const isConnected = useConnectionStatus();
   const { idea, votes, voters, linkedProject, creator } = useIdea(id || "");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -510,6 +713,20 @@ export function IdeaPage() {
       {} as Record<string, AgentsRow>,
     );
   }, [voters]);
+
+  const dimensionWeights = useMemo(() => {
+    const map: DimensionWeightMap = new Map();
+    for (const dim of dimensions) {
+      if (dim.weight > 0 && dim.maxScore > dim.minScore) {
+        map.set(dim.name, {
+          weight: dim.weight,
+          minScore: dim.minScore,
+          maxScore: dim.maxScore,
+        });
+      }
+    }
+    return map;
+  }, [dimensions]);
 
   const sortedVotes = useMemo(() => {
     return [...votes].sort(
@@ -546,6 +763,7 @@ export function IdeaPage() {
       isVoting={isVoting}
       sortedVotes={sortedVotes}
       voterMap={voterMap}
+      dimensionWeights={dimensionWeights}
       dialogOpen={dialogOpen}
       setDialogOpen={setDialogOpen}
       navigate={navigate}

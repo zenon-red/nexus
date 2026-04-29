@@ -11,6 +11,16 @@ import { CyberProgress } from "@/components/ui/CyberProgress";
 import { AlienAvatar } from "@zenon-red/alien-avatars-react";
 import { Skeleton } from "@/components/ui/skeleton";
 
+const APPROVAL_THRESHOLD = 7.0;
+const VETO_FLOOR = 2.0;
+const MAX_SCORE = 10;
+
+function getScoreProgressColor(score: number): "success" | "cyan" | "destructive" {
+  if (score >= APPROVAL_THRESHOLD) return "success";
+  if (score >= VETO_FLOOR) return "cyan";
+  return "destructive";
+}
+
 function formatTimeAgo(timestamp: { microsSinceUnixEpoch: bigint }): string {
   const now = Date.now();
   const then = Number(timestamp.microsSinceUnixEpoch / 1000n);
@@ -43,7 +53,9 @@ interface IdeaRowProps {
   description: string;
   category: string;
   status: IdeaStatus;
-  approvalThreshold: number;
+  computedScore: number;
+  quorum: number;
+  totalVotes: number;
   vetoThreshold: number;
   upVotes: number;
   downVotes: number;
@@ -64,7 +76,9 @@ const IdeaRow = memo(function IdeaRow({
   description,
   category,
   status,
-  approvalThreshold,
+  computedScore,
+  quorum,
+  totalVotes,
   vetoThreshold,
   upVotes,
   downVotes,
@@ -115,7 +129,7 @@ const IdeaRow = memo(function IdeaRow({
           isImplemented && "bg-linear-to-r from-accent/2 to-accent/4.5",
         )}
       >
-        <div className="flex min-w-[44px] flex-col items-center justify-center gap-1">
+        <div className="flex min-w-11 flex-col items-center justify-center gap-1">
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -185,20 +199,32 @@ const IdeaRow = memo(function IdeaRow({
 
             <div className="mx-auto mt-1 w-full max-w-[320px]">
               {IdeaStatusEnum.is.voting(status) ? (
-                <>
-                  <div className="mb-1 text-center font-mono text-tiny text-muted-foreground">
-                    APPROVAL {upVotes}/{approvalThreshold}
-                  </div>
-                  {!isVetoed && (
+                <div className="flex gap-10">
+                  <div className="flex-1">
                     <CyberProgress
-                      value={upVotes}
-                      max={Math.max(approvalThreshold, 1)}
-                      color={upVotes >= approvalThreshold ? "success" : "primary"}
-                      size="xl"
+                      value={computedScore}
+                      max={MAX_SCORE}
+                      color={getScoreProgressColor(computedScore)}
+                      size="md"
                       showPercentage={false}
+                      showLabels={false}
+                      label="Score"
+                      valueLabel={computedScore.toFixed(1)}
                     />
-                  )}
-                </>
+                  </div>
+                  <div className="flex-1">
+                    <CyberProgress
+                      value={totalVotes}
+                      max={quorum}
+                      color={totalVotes >= quorum ? "success" : "primary"}
+                      size="md"
+                      showPercentage={false}
+                      showLabels={false}
+                      label="Quorum"
+                      valueLabel={`${totalVotes}/${quorum}`}
+                    />
+                  </div>
+                </div>
               ) : (
                 <div
                   className={cn(
@@ -253,7 +279,7 @@ function IdeasViewSkeleton() {
     <div className="space-y-2 px-3 py-3">
       {Array.from({ length: 5 }).map((_, index) => (
         <div key={index} className="flex gap-3 border-b border-border/10 px-3 py-3">
-          <div className="flex min-w-[44px] flex-col items-center gap-1">
+          <div className="flex min-w-11 flex-col items-center gap-1">
             <Skeleton className={cn("size-5 rounded-sm", skeletonTone)} />
             <Skeleton className={cn("h-4 w-8", skeletonTone)} />
             <Skeleton className={cn("size-5 rounded-sm", skeletonTone)} />
@@ -300,13 +326,7 @@ export function IdeasView({
         filtered = ideas.filter((i) => IdeaStatusEnum.is.rejected(i.status));
       }
     }
-    return [...filtered]
-      .sort((a, b) => {
-        const scoreA = a.upVotes - a.downVotes;
-        const scoreB = b.upVotes - b.downVotes;
-        return scoreB - scoreA;
-      })
-      .slice(0, maxItems);
+    return [...filtered].sort((a, b) => b.computedScore - a.computedScore).slice(0, maxItems);
   }, [ideas, maxItems, filter]);
 
   const title =
@@ -379,7 +399,9 @@ export function IdeasView({
                   description={idea.description}
                   category={idea.category}
                   status={idea.status}
-                  approvalThreshold={idea.approvalThreshold}
+                  computedScore={idea.computedScore}
+                  quorum={idea.quorum}
+                  totalVotes={idea.totalVotes}
                   vetoThreshold={idea.vetoThreshold}
                   upVotes={idea.upVotes}
                   downVotes={idea.downVotes}

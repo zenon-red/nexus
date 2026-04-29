@@ -22,4 +22,6 @@ pub struct Idea {
     pub created_by: String,
     pub created_at: Timestamp,
     pub updated_at: Timestamp,
+    #[default(0.0)]
+    pub computed_score: f64,
 }

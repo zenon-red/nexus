@@ -15,7 +15,16 @@ export class ChallengeStore {
     return result.value;
   }
 
-  async remove(nonce: string): Promise<void> {
-    await this.kv.delete(["challenge", nonce]);
+  async consumeIfMatches(nonce: string, address: string): Promise<boolean> {
+    const key = ["challenge", nonce];
+    const entry = await this.kv.get<ChallengeNonce>(key);
+    if (!entry.value || entry.value.address !== address) return false;
+
+    const res = await this.kv.atomic()
+      .check(entry)
+      .delete(key)
+      .commit();
+
+    return res.ok;
   }
 }

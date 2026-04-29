@@ -6,6 +6,7 @@ use crate::types::AgentRole;
 const ZOE_IDENTITIES: &[&str] = &[
     "c20042e1bccdf9eeddb52cf0d58d99e8c31eeba188fd98bc91c206f86b3b8955",
     "c200c7d4c23d986d28a5f033f523a9b79eb4b8472df63cff2998518d27bdd0ba",
+    "c200c62241c00a10307076de3ea76a8e4a45aa916e9ace64325ef2221faa9522",
 ];
 
 pub fn is_zoe_identity(identity: &Identity) -> bool {

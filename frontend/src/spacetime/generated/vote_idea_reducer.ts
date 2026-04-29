@@ -11,12 +11,12 @@ import {
 } from "spacetimedb";
 
 import {
-  VoteType,
+  DimensionScore,
 } from "./types";
 
 export default {
   ideaId: __t.u64(),
-  get voteType() {
-    return VoteType;
+  get scores() {
+    return __t.array(DimensionScore);
   },
 };

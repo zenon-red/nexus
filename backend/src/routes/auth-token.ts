@@ -7,6 +7,14 @@ import { addressMatchesPublicKey, validateZenonAddress } from "../zenon.ts";
 import type { RouteContext } from "./context.ts";
 
 export async function handleAuthToken(req: Request, ctx: RouteContext): Promise<Response> {
+  const rateLimit = await ctx.rateLimiter.check(ctx.ip);
+  if (!rateLimit.allowed) {
+    return Response.json(
+      { error: "rate_limited", message: "Too many requests" },
+      { status: 429, headers: ctx.headers },
+    );
+  }
+
   const parsedBody = await parseJsonBody(req, ctx.headers);
   if ("error" in parsedBody) return parsedBody.error;
 
@@ -53,16 +61,9 @@ export async function handleAuthToken(req: Request, ctx: RouteContext): Promise<
   }
 
   const challengeData = await ctx.challengeStore.get(nonce);
-  if (!challengeData) {
+  if (!challengeData || challengeData.address !== address) {
     return Response.json(
       { error: "expired_nonce", message: "Invalid or expired nonce" },
-      { status: 400, headers: ctx.headers },
-    );
-  }
-
-  if (challengeData.address !== address) {
-    return Response.json(
-      { error: "address_mismatch", message: "Address mismatch" },
       { status: 400, headers: ctx.headers },
     );
   }
@@ -80,7 +81,13 @@ export async function handleAuthToken(req: Request, ctx: RouteContext): Promise<
     );
   }
 
-  await ctx.challengeStore.remove(nonce);
+  const consumed = await ctx.challengeStore.consumeIfMatches(nonce, address);
+  if (!consumed) {
+    return Response.json(
+      { error: "expired_nonce", message: "Nonce was already consumed" },
+      { status: 400, headers: ctx.headers },
+    );
+  }
 
-  return Response.json(await issueToken(address), { headers: ctx.headers });
+  return Response.json(await issueToken(address, ctx.config), { headers: ctx.headers });
 }

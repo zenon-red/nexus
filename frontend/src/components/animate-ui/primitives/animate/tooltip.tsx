@@ -75,13 +75,6 @@ function getResolvedSide(placement: Side | `${Side}-${Align}`) {
   return placement as Side;
 }
 
-function initialFromSide(side: Side): Partial<Record<"x" | "y", number>> {
-  if (side === "top") return { y: 15 };
-  if (side === "bottom") return { y: -15 };
-  if (side === "left") return { x: 15 };
-  return { x: -15 };
-}
-
 type TooltipProviderProps = {
   children: React.ReactNode;
   id?: string;
@@ -95,7 +88,7 @@ function TooltipProvider({
   id,
   openDelay = 700,
   closeDelay = 300,
-  transition = { type: "spring", stiffness: 300, damping: 35 },
+  transition = { duration: 0.1, ease: "easeOut" },
 }: TooltipProviderProps) {
   const globalId = React.useId();
   const [currentTooltip, setCurrentTooltip] = React.useState<TooltipData | null>(null);
@@ -222,7 +215,7 @@ function TooltipPortal(props: TooltipPortalProps) {
 }
 
 function TooltipOverlay() {
-  const { currentTooltip, transition, globalId, referenceElRef } = useGlobalTooltip();
+  const { currentTooltip, transition, referenceElRef } = useGlobalTooltip();
 
   const [rendered, setRendered] = React.useState<{
     data: TooltipData | null;
@@ -298,26 +291,9 @@ function TooltipOverlay() {
                   data-side={resolvedSide}
                   data-align={rendered.data.align}
                   data-state={rendered.open ? "open" : "closed"}
-                  layoutId={`tooltip-content-${globalId}`}
-                  initial={{
-                    opacity: 0,
-                    scale: 0.95,
-                    ...initialFromSide(rendered.data.side),
-                  }}
-                  animate={
-                    rendered.open
-                      ? { opacity: 1, scale: 1, x: 0, y: 0 }
-                      : {
-                          opacity: 0,
-                          scale: 0.95,
-                          ...initialFromSide(rendered.data.side),
-                        }
-                  }
-                  exit={{
-                    opacity: 0,
-                    scale: 0.95,
-                    ...initialFromSide(rendered.data.side),
-                  }}
+                  initial={{ opacity: 0 }}
+                  animate={rendered.open ? { opacity: 1 } : { opacity: 0 }}
+                  exit={{ opacity: 0 }}
                   onAnimationComplete={() => {
                     if (!rendered.open) setRendered({ data: null, open: false });
                   }}

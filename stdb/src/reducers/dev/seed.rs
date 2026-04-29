@@ -2,6 +2,7 @@ use spacetimedb::{Identity, ReducerContext, Table, reducer};
 use std::time::Duration;
 
 use crate::helpers::auth::require_role;
+use crate::helpers::scoring::{compute_idea_score, derive_vote_type};
 use crate::tables::agent::{Agent, agents};
 use crate::tables::channel::{Channel, channels};
 use crate::tables::config::{Config, config};
@@ -16,14 +17,40 @@ use crate::tables::task::{Task, tasks};
 use crate::tables::task_dependency::{TaskDependency, task_dependencies};
 use crate::tables::vote::{Vote, votes};
 use crate::types::{
-    AgentRole, AgentStatus, DependencyType, DiscoveredTaskStatus, IdeaStatus, MessageType,
-    ProjectStatus, TaskStatus, VoteType,
+    AgentRole, AgentStatus, DependencyType, DimensionScore, DiscoveredTaskStatus, IdeaStatus,
+    MessageType, ProjectStatus, TaskStatus, VoteType,
 };
 
-const DEV_SEED_KEY: &str = "dev_seed_ui_v10";
+const DEV_SEED_KEY: &str = "dev_seed_ui_v11";
 
 fn parse_identity(identity_hex: &str) -> Result<Identity, String> {
     Identity::from_hex(identity_hex).map_err(|_| format!("Invalid seed identity: {}", identity_hex))
+}
+
+fn dimension_scores(
+    ecosystem_impact: u8,
+    implementation_readiness: u8,
+    dependency_independence: u8,
+    documentation_leverage: u8,
+    maintenance_sustainability: u8,
+    agent_capability_fit: u8,
+    execution_clarity: u8,
+) -> Vec<DimensionScore> {
+    [
+        ("ecosystem_impact", ecosystem_impact),
+        ("implementation_readiness", implementation_readiness),
+        ("dependency_independence", dependency_independence),
+        ("documentation_leverage", documentation_leverage),
+        ("maintenance_sustainability", maintenance_sustainability),
+        ("agent_capability_fit", agent_capability_fit),
+        ("execution_clarity", execution_clarity),
+    ]
+    .iter()
+    .map(|(dimension, score)| DimensionScore {
+        dimension: dimension.to_string(),
+        score: *score,
+    })
+    .collect()
 }
 
 #[reducer]
@@ -113,12 +140,31 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
             });
         }
 
+        let capabilities = match *id {
+            "zr-zoe" => vec!["reviewer".to_string(), "architect".to_string()],
+            "atlas-admin" => vec![
+                "reviewer".to_string(),
+                "architect".to_string(),
+                "scout".to_string(),
+            ],
+            "lyra-admin" => vec![
+                "reviewer".to_string(),
+                "architect".to_string(),
+                "scout".to_string(),
+            ],
+            "orion" => vec!["reviewer".to_string(), "scout".to_string()],
+            "halley" => vec!["reviewer".to_string(), "scout".to_string()],
+            "avalon" => vec!["scout".to_string()],
+            "mariana" => vec!["reviewer".to_string(), "architect".to_string()],
+            _ => vec![],
+        };
+
         if ctx.db.agents().id().find(id.to_string()).is_none() {
             ctx.db.agents().insert(Agent {
                 id: id.to_string(),
                 name: name.to_string(),
                 role: *role,
-                capabilities: vec![],
+                capabilities,
                 status: status.clone(),
                 zenon_address: address.to_string(),
                 identity,
@@ -257,6 +303,7 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
             created_by: "atlas-admin".to_string(),
             created_at: idea_created_at,
             updated_at: idea_updated_at,
+            computed_score: 0.0,
         });
         idea_ids.push(inserted_idea.id);
 
@@ -692,20 +739,22 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         });
     }
 
-    let vote_specs = [
-        ("atlas-admin", VoteType::Up),
-        ("lyra-admin", VoteType::Up),
-        ("orion", VoteType::Down),
-        ("halley", VoteType::Up),
+    let vote_specs: [(&str, Vec<DimensionScore>); 4] = [
+        ("atlas-admin", dimension_scores(9, 7, 6, 8, 7, 8, 8)),
+        ("lyra-admin", dimension_scores(8, 8, 7, 9, 8, 7, 9)),
+        ("orion", dimension_scores(5, 4, 6, 5, 4, 4, 3)),
+        ("halley", dimension_scores(8, 7, 6, 7, 6, 7, 7)),
     ];
 
     for (idea_offset, idea_id) in idea_ids.iter().take(3).enumerate() {
-        for (vote_idx, (agent_id, vote_type)) in vote_specs.iter().enumerate() {
+        for (vote_idx, (agent_id, scores)) in vote_specs.iter().enumerate() {
+            let vote_type = derive_vote_type(ctx, scores);
             ctx.db.votes().insert(Vote {
                 id: 0,
                 idea_id: *idea_id,
                 agent_id: (*agent_id).to_string(),
-                vote_type: vote_type.clone(),
+                vote_type,
+                scores: scores.clone(),
                 created_at: hours_ago((idea_offset as u64 * 16) + (vote_idx as u64 * 2) + 28),
             });
         }
@@ -729,6 +778,7 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         created_by: "avalon".to_string(),
         created_at: hours_ago(56),
         updated_at: hours_ago(12),
+        computed_score: 0.0,
     });
 
     let quorum_met_idea = ctx.db.ideas().insert(Idea {
@@ -749,6 +799,7 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         created_by: "halley".to_string(),
         created_at: hours_ago(48),
         updated_at: hours_ago(10),
+        computed_score: 0.0,
     });
 
     let implemented_idea = ctx.db.ideas().insert(Idea {
@@ -769,6 +820,7 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         created_by: "lyra-admin".to_string(),
         created_at: hours_ago(140),
         updated_at: hours_ago(64),
+        computed_score: 0.0,
     });
 
     let rejected_idea = ctx.db.ideas().insert(Idea {
@@ -788,6 +840,7 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         created_by: "mariana".to_string(),
         created_at: hours_ago(170),
         updated_at: hours_ago(110),
+        computed_score: 0.0,
     });
 
     let low_vote_idea_one = ctx.db.ideas().insert(Idea {
@@ -809,6 +862,7 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         created_by: "mariana".to_string(),
         created_at: hours_ago(30),
         updated_at: hours_ago(8),
+        computed_score: 0.0,
     });
 
     let low_vote_idea_two = ctx.db.ideas().insert(Idea {
@@ -829,6 +883,7 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         created_by: "avalon".to_string(),
         created_at: hours_ago(26),
         updated_at: hours_ago(6),
+        computed_score: 0.0,
     });
 
     let low_vote_idea_three = ctx.db.ideas().insert(Idea {
@@ -850,40 +905,135 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         created_by: "halley".to_string(),
         created_at: hours_ago(22),
         updated_at: hours_ago(4),
+        computed_score: 0.0,
     });
 
-    let extra_votes = [
-        (no_quorum_idea.id, "orion", VoteType::Up),
-        (no_quorum_idea.id, "halley", VoteType::Up),
-        (no_quorum_idea.id, "atlas-admin", VoteType::Down),
-        (quorum_met_idea.id, "atlas-admin", VoteType::Up),
-        (quorum_met_idea.id, "lyra-admin", VoteType::Up),
-        (quorum_met_idea.id, "orion", VoteType::Up),
-        (quorum_met_idea.id, "halley", VoteType::Up),
-        (quorum_met_idea.id, "avalon", VoteType::Down),
-        (quorum_met_idea.id, "mariana", VoteType::Down),
-        (implemented_idea.id, "atlas-admin", VoteType::Up),
-        (implemented_idea.id, "lyra-admin", VoteType::Up),
-        (implemented_idea.id, "orion", VoteType::Up),
-        (implemented_idea.id, "halley", VoteType::Up),
-        (implemented_idea.id, "mariana", VoteType::Up),
-        (rejected_idea.id, "atlas-admin", VoteType::Veto),
-        (rejected_idea.id, "lyra-admin", VoteType::Veto),
-        (rejected_idea.id, "orion", VoteType::Veto),
-        (rejected_idea.id, "halley", VoteType::Down),
-        (low_vote_idea_one.id, "atlas-admin", VoteType::Up),
-        (low_vote_idea_two.id, "orion", VoteType::Up),
-        (low_vote_idea_two.id, "lyra-admin", VoteType::Down),
-        (low_vote_idea_three.id, "halley", VoteType::Up),
-        (low_vote_idea_three.id, "mariana", VoteType::Up),
+    let extra_votes: Vec<(u64, &str, Vec<DimensionScore>)> = vec![
+        (
+            no_quorum_idea.id,
+            "orion",
+            dimension_scores(7, 6, 5, 6, 6, 5, 6),
+        ),
+        (
+            no_quorum_idea.id,
+            "halley",
+            dimension_scores(8, 7, 6, 7, 7, 6, 7),
+        ),
+        (
+            no_quorum_idea.id,
+            "atlas-admin",
+            dimension_scores(4, 3, 5, 4, 4, 3, 3),
+        ),
+        (
+            quorum_met_idea.id,
+            "atlas-admin",
+            dimension_scores(8, 7, 6, 7, 7, 7, 8),
+        ),
+        (
+            quorum_met_idea.id,
+            "lyra-admin",
+            dimension_scores(9, 8, 7, 8, 7, 8, 9),
+        ),
+        (
+            quorum_met_idea.id,
+            "orion",
+            dimension_scores(8, 7, 6, 7, 6, 7, 7),
+        ),
+        (
+            quorum_met_idea.id,
+            "halley",
+            dimension_scores(8, 7, 5, 7, 6, 7, 7),
+        ),
+        (
+            quorum_met_idea.id,
+            "avalon",
+            dimension_scores(4, 5, 6, 4, 5, 4, 4),
+        ),
+        (
+            quorum_met_idea.id,
+            "mariana",
+            dimension_scores(5, 4, 5, 4, 5, 4, 4),
+        ),
+        (
+            implemented_idea.id,
+            "atlas-admin",
+            dimension_scores(9, 8, 7, 8, 7, 9, 9),
+        ),
+        (
+            implemented_idea.id,
+            "lyra-admin",
+            dimension_scores(9, 8, 7, 9, 8, 8, 9),
+        ),
+        (
+            implemented_idea.id,
+            "orion",
+            dimension_scores(8, 7, 6, 8, 7, 7, 8),
+        ),
+        (
+            implemented_idea.id,
+            "halley",
+            dimension_scores(9, 8, 7, 8, 7, 8, 9),
+        ),
+        (
+            implemented_idea.id,
+            "mariana",
+            dimension_scores(8, 7, 6, 7, 7, 7, 8),
+        ),
+        (
+            rejected_idea.id,
+            "atlas-admin",
+            dimension_scores(2, 2, 8, 2, 3, 2, 2),
+        ),
+        (
+            rejected_idea.id,
+            "lyra-admin",
+            dimension_scores(2, 3, 9, 2, 3, 2, 2),
+        ),
+        (
+            rejected_idea.id,
+            "orion",
+            dimension_scores(1, 2, 9, 2, 2, 1, 1),
+        ),
+        (
+            rejected_idea.id,
+            "halley",
+            dimension_scores(3, 4, 7, 3, 4, 3, 3),
+        ),
+        (
+            low_vote_idea_one.id,
+            "atlas-admin",
+            dimension_scores(7, 6, 5, 7, 6, 6, 7),
+        ),
+        (
+            low_vote_idea_two.id,
+            "orion",
+            dimension_scores(7, 6, 5, 6, 6, 5, 6),
+        ),
+        (
+            low_vote_idea_two.id,
+            "lyra-admin",
+            dimension_scores(4, 5, 5, 4, 5, 4, 4),
+        ),
+        (
+            low_vote_idea_three.id,
+            "halley",
+            dimension_scores(7, 6, 5, 7, 6, 6, 7),
+        ),
+        (
+            low_vote_idea_three.id,
+            "mariana",
+            dimension_scores(8, 7, 6, 7, 7, 7, 8),
+        ),
     ];
 
-    for (vote_idx, (idea_id, agent_id, vote_type)) in extra_votes.into_iter().enumerate() {
+    for (vote_idx, (idea_id, agent_id, scores)) in extra_votes.into_iter().enumerate() {
+        let vote_type = derive_vote_type(ctx, &scores);
         ctx.db.votes().insert(Vote {
             id: 0,
             idea_id,
             agent_id: agent_id.to_string(),
             vote_type,
+            scores,
             created_at: hours_ago(20 - (vote_idx as u64 % 10)),
         });
     }
@@ -963,6 +1113,35 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         ctx.db.config().insert(Config {
             key: long_task_key,
             value: long_task_ids_value,
+        });
+    }
+
+    for idea in ctx.db.ideas().iter() {
+        let idea_votes: Vec<Vote> = ctx.db.votes().by_idea().filter(&idea.id).collect();
+        if idea_votes.is_empty() {
+            continue;
+        }
+        let up = idea_votes
+            .iter()
+            .filter(|v| v.vote_type == VoteType::Up)
+            .count() as u16;
+        let down = idea_votes
+            .iter()
+            .filter(|v| v.vote_type == VoteType::Down)
+            .count() as u16;
+        let veto = idea_votes
+            .iter()
+            .filter(|v| v.vote_type == VoteType::Veto)
+            .count() as u16;
+        let total = idea_votes.len() as u16;
+        let computed_score = compute_idea_score(ctx, idea.id);
+        ctx.db.ideas().id().update(Idea {
+            up_votes: up,
+            down_votes: down,
+            veto_count: veto,
+            total_votes: total,
+            computed_score,
+            ..idea
         });
     }
 

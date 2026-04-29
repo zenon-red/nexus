@@ -103,6 +103,8 @@ Generates a challenge nonce for wallet authentication.
 | Code | Message |
 |------|---------|
 | 400 | `invalid_json`, `invalid_request`, `invalid_address` |
+| 413 | `payload_too_large` |
+| 415 | `invalid_content_type` |
 | 429 | `rate_limited` - Too many requests |
 
 ---
@@ -145,8 +147,11 @@ Exchanges a signed challenge for a JWT.
 **Errors:**
 | Code | Message |
 |------|---------|
-| 400 | `invalid_json`, `invalid_request`, `invalid_address`, `invalid_public_key`, `invalid_signature`, `invalid_nonce`, `expired_nonce`, `address_mismatch` |
+| 400 | `invalid_json`, `invalid_request`, `invalid_address`, `invalid_public_key`, `invalid_signature`, `invalid_nonce`, `expired_nonce` |
 | 401 | `address_key_mismatch`, `invalid_signature` |
+| 413 | `payload_too_large` |
+| 415 | `invalid_content_type` |
+| 429 | `rate_limited` |
 
 ---
 

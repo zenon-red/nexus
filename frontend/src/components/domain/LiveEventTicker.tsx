@@ -12,9 +12,16 @@ import {
   VoteTypeEnum,
 } from "@/spacetime/hooks";
 import { cn } from "@/lib/utils";
-import { MessageSquare, ThumbsUp, ThumbsDown, GitMerge, Lightbulb } from "lucide-react";
+import { MessageSquare, ThumbsUp, ThumbsDown, Octagon, GitMerge, Lightbulb } from "lucide-react";
 
-type EventType = "message" | "project_message" | "vote_up" | "vote_down" | "task" | "idea";
+type EventType =
+  | "message"
+  | "project_message"
+  | "vote_up"
+  | "vote_down"
+  | "vote_veto"
+  | "task"
+  | "idea";
 
 interface Event {
   id: string;
@@ -29,7 +36,8 @@ const eventConfig: Record<EventType, { icon: React.ElementType; color: string }>
   message: { icon: MessageSquare, color: "text-primary" },
   project_message: { icon: MessageSquare, color: "text-purple-400" },
   vote_up: { icon: ThumbsUp, color: "text-success" },
-  vote_down: { icon: ThumbsDown, color: "text-destructive" },
+  vote_down: { icon: ThumbsDown, color: "text-cyan-400" },
+  vote_veto: { icon: Octagon, color: "text-destructive" },
   task: { icon: GitMerge, color: "text-purple-400" },
   idea: { icon: Lightbulb, color: "text-warning" },
 };
@@ -88,13 +96,23 @@ export function LiveEventTicker() {
     }));
     if (latestProjectMessage) candidates.push(latestProjectMessage);
 
-    const latestVote = findLatest(votes, (vote) => ({
-      id: `vote-${vote.id}`,
-      type: (VoteTypeEnum.is.up(vote.voteType) ? "vote_up" : "vote_down") as EventType,
-      title: `voted ${VoteTypeEnum.display(vote.voteType)}`,
-      actor: vote.agentId,
-      timestamp: Number(vote.createdAt.microsSinceUnixEpoch),
-    }));
+    const latestVote = findLatest(votes, (vote) => {
+      let type: EventType;
+      if (VoteTypeEnum.is.up(vote.voteType)) {
+        type = "vote_up";
+      } else if (VoteTypeEnum.is.veto(vote.voteType)) {
+        type = "vote_veto";
+      } else {
+        type = "vote_down";
+      }
+      return {
+        id: `vote-${vote.id}`,
+        type,
+        title: `voted ${VoteTypeEnum.display(vote.voteType)}`,
+        actor: vote.agentId,
+        timestamp: Number(vote.createdAt.microsSinceUnixEpoch),
+      };
+    });
     if (latestVote) candidates.push(latestVote);
 
     const latestTask = findLatest(tasks, (task) => ({

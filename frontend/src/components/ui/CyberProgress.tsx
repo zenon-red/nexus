@@ -6,10 +6,20 @@ interface CyberProgressProps {
   value: number;
   max?: number;
   label?: string;
-  color?: "primary" | "success" | "warning" | "destructive";
+  color?: "primary" | "success" | "warning" | "destructive" | "cyan";
   size?: "sm" | "md" | "lg" | "xl";
   showPercentage?: boolean;
+  valueLabel?: string;
+  showLabels?: boolean;
 }
+
+const colorTextClasses = {
+  primary: "text-primary",
+  success: "text-success",
+  warning: "text-warning",
+  destructive: "text-destructive",
+  cyan: "text-cyan-400",
+};
 
 export function CyberProgress({
   value,
@@ -18,6 +28,8 @@ export function CyberProgress({
   color = "primary",
   size = "md",
   showPercentage = true,
+  valueLabel,
+  showLabels = true,
 }: CyberProgressProps) {
   const percentage = Math.min((value / max) * 100, 100);
 
@@ -26,6 +38,7 @@ export function CyberProgress({
     success: "from-success/20 to-success",
     warning: "from-warning/20 to-warning",
     destructive: "from-destructive/20 to-destructive",
+    cyan: "from-cyan-400/20 to-cyan-400",
   };
 
   const sizeClasses = {
@@ -37,11 +50,15 @@ export function CyberProgress({
 
   return (
     <div className="w-full space-y-2">
-      {(label || showPercentage) && (
+      {(label || showPercentage || valueLabel) && (
         <div className="flex items-center justify-between font-mono text-xs">
           {label && <span className="tracking-wider text-muted-foreground uppercase">{label}</span>}
-          {showPercentage && (
-            <span className="font-semibold text-foreground">{Math.round(percentage)}%</span>
+          {valueLabel ? (
+            <span className={`text-sm font-bold ${colorTextClasses[color]}`}>{valueLabel}</span>
+          ) : (
+            showPercentage && (
+              <span className="font-semibold text-foreground">{Math.round(percentage)}%</span>
+            )
           )}
         </div>
       )}
@@ -86,10 +103,12 @@ export function CyberProgress({
         </div>
       </div>
 
-      <div className="flex items-center justify-between font-mono text-tiny text-muted-foreground">
-        <span>0</span>
-        <span>{max}</span>
-      </div>
+      {showLabels && (
+        <div className="flex items-center justify-between font-mono text-tiny text-muted-foreground">
+          <span>0</span>
+          <span>{max}</span>
+        </div>
+      )}
     </div>
   );
 }

@@ -107,6 +107,7 @@ pub fn review_discovered_task(
                 created_by: discovery.discovered_by.clone(),
                 created_at: ctx.timestamp,
                 updated_at: ctx.timestamp,
+                computed_score: 0.0,
             });
 
             ctx.db.discovered_tasks().id().update(DiscoveredTask {

@@ -200,6 +200,12 @@ impl MessageType {
 }
 
 #[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub struct DimensionScore {
+    pub dimension: String,
+    pub score: u8,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
 pub enum DependencyType {
     Blocks,
     ParentChild,

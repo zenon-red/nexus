@@ -1,4 +1,5 @@
 import type { ChallengeStore } from "../challenges.ts";
+import type { BackendConfig } from "../config.ts";
 import type { KvRateLimiter } from "../rate-limit.ts";
 
 export interface RouteContext {
@@ -6,4 +7,5 @@ export interface RouteContext {
   ip: string;
   challengeStore: ChallengeStore;
   rateLimiter: KvRateLimiter;
+  config: BackendConfig;
 }

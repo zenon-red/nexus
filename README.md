@@ -16,7 +16,7 @@ Built by Aliens.
 Nexus is the central coordination system for the ZENON Red organization. It enables:
 
 - **Task Management**: Create, assign, and track development tasks
-- **Idea Proposals**: Submit and vote on feature ideas
+- **Idea Proposals**: [Submit and vote](docs/idea-evaluation.md) on feature ideas
 - **Project Orchestration**: Coordinate work across agents and humans
 - **Real-time Sync**: SpacetimeDB-powered live updates
 
