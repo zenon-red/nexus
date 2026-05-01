@@ -12,6 +12,7 @@ import { IdeaPage } from "./routes/IdeaPage";
 import { ProjectPage } from "./routes/ProjectPage";
 import { IdeasListPage } from "./routes/IdeasListPage";
 import { TasksListPage } from "./routes/TasksListPage";
+import { AgentProfilePage } from "./routes/AgentProfilePage";
 
 quietSpacetimeLogs();
 
@@ -27,6 +28,7 @@ createRoot(document.getElementById("root")!).render(
             <Route path="/ideas/:id" element={<IdeaPage />} />
             <Route path="/tasks" element={<TasksListPage />} />
             <Route path="/projects/:id" element={<ProjectPage />} />
+            <Route path="/agents/:id" element={<AgentProfilePage />} />
           </Routes>
         </LazyMotion>
       </SpacetimeProvider>

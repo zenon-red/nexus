@@ -2,12 +2,13 @@ import { AppShell } from "@/components/layout";
 import { TaskBoard, IdeasView, TalkingHead } from "@/components/domain";
 import { MessageFeed } from "@/components/domain/MessageFeed";
 import { LiveEventTicker } from "@/components/domain/LiveEventTicker";
+import { VoiceAnnouncer, type VoiceAnnouncerState } from "@/components/domain/VoiceAnnouncer";
 import { MatrixGrid } from "@/components/ui/MatrixGrid";
 import { useNavigate } from "react-router";
 import { m } from "motion/react";
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useIdeas, useTasks, useProjects } from "@/spacetime/hooks";
-import { ArrowUpRight, Wifi } from "lucide-react";
+import { ArrowUpRight, Wifi, Play, Pause } from "lucide-react";
 
 function TerminalStatsBar() {
   const ideas = useIdeas();
@@ -43,13 +44,31 @@ function TerminalStatsBar() {
 export function Dashboard() {
   const navigate = useNavigate();
   const [activeChatChannel, setActiveChatChannel] = useState("general");
+  const [voiceState, setVoiceState] = useState<VoiceAnnouncerState | null>(null);
+  const [voiceLevels, setVoiceLevels] = useState<number[] | undefined>(undefined);
+
+  const handleVoiceStateChange = useCallback((state: VoiceAnnouncerState) => {
+    setVoiceState(state);
+  }, []);
+
+  const handleVoiceLevelsChange = useCallback((levels: number[]) => {
+    setVoiceLevels(levels);
+  }, []);
 
   return (
     <AppShell>
       <div className="flex h-screen flex-col bg-background">
+        <VoiceAnnouncer
+          onStateChange={handleVoiceStateChange}
+          onLevelsChange={handleVoiceLevelsChange}
+        />
         <header className="shrink-0 border-b border-border bg-surface">
-          <div className="flex justify-center px-6 py-3">
-            <LiveEventTicker />
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center px-6 py-3">
+            <div className="justify-self-start" />
+            <div className="justify-self-center">
+              <LiveEventTicker />
+            </div>
+            <div aria-hidden className="justify-self-end" />
           </div>
         </header>
 
@@ -91,12 +110,39 @@ export function Dashboard() {
                 <div className="pointer-events-none absolute inset-0 opacity-20">
                   <MatrixGrid
                     className="h-full w-full"
-                    forcedMode={activeChatChannel === "zoe" ? "omacron" : undefined}
+                    forcedMode={
+                      voiceState?.isPlaying
+                        ? "vu"
+                        : activeChatChannel === "zoe"
+                          ? "omacron"
+                          : undefined
+                    }
+                    levels={voiceState?.isPlaying ? voiceLevels : undefined}
                   />
                 </div>
                 <div className="relative z-10 flex h-full items-end justify-center">
                   <TalkingHead showWordmark />
                 </div>
+                {voiceState?.autoplayBlocked && (
+                  <button
+                    type="button"
+                    onClick={() => voiceState.enableVoice()}
+                    className="absolute bottom-3 left-3 z-20 inline-flex items-center gap-1.5 rounded-md border border-border bg-black px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-black/80"
+                  >
+                    <Play className="size-3.5" />
+                    Enable Voice
+                  </button>
+                )}
+                {voiceState?.isPlaying && (
+                  <button
+                    type="button"
+                    onClick={() => voiceState.pauseVoice()}
+                    className="absolute bottom-3 left-3 z-20 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-black text-foreground transition-colors hover:bg-black/80"
+                    aria-label="Pause voice"
+                  >
+                    <Pause className="size-3.5" />
+                  </button>
+                )}
               </div>
               <div className="flex h-[62vh] max-h-[62vh] min-h-85 flex-col lg:h-auto lg:max-h-none lg:min-h-0 lg:flex-1">
                 <MessageFeed className="h-full" onActiveChannelChange={setActiveChatChannel} />

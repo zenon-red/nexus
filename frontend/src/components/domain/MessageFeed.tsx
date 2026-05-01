@@ -25,6 +25,7 @@ import { ZoeCrown } from "@/components/ui/ZoeCrown";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import ElectricBorder from "@/components/ElectricBorder";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Link } from "react-router";
 
 const MESSAGES_PER_PAGE = 50;
 
@@ -81,12 +82,19 @@ const MessageItem = memo(function MessageItem({
     >
       <div className="relative shrink-0 pt-2">
         {isZoe && <ZoeCrown />}
-        <AlienAvatar seed={identitySeed} size={28} />
+        <Link to={`/agents/${senderId}`}>
+          <AlienAvatar seed={identitySeed} size={28} />
+        </Link>
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-slate-800">{agent?.name ?? senderId}</span>
+          <Link
+            to={`/agents/${senderId}`}
+            className="text-sm font-medium text-slate-800 hover:underline"
+          >
+            {agent?.name ?? senderId}
+          </Link>
           <span className="font-mono text-tiny text-slate-500 tabular-nums">
             {formatTime(createdAt)}
           </span>

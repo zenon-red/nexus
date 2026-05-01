@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 
 import { cn } from "@/lib/utils";
-import { Matrix, type Frame } from "./matrix";
+import { Matrix, type Frame, waveform } from "./matrix";
 
 const ANIM_ROWS = 12;
 const ANIM_COLS = 18;
@@ -108,21 +108,23 @@ function generateCompactOMacron(): Frame {
   return frame;
 }
 
-type Mode = "wave" | "pulse" | "omacron";
+type Mode = "wave" | "pulse" | "omacron" | "vu";
 
 const modeSequence: Mode[] = ["wave", "pulse", "omacron"];
 const modeDurations: Record<Mode, number> = {
   wave: 5000,
   pulse: 4000,
   omacron: 4000,
+  vu: 4000,
 };
 
 interface MatrixGridProps {
   className?: string;
   forcedMode?: Mode;
+  levels?: number[];
 }
 
-export function MatrixGrid({ className, forcedMode }: MatrixGridProps) {
+export function MatrixGrid({ className, forcedMode, levels }: MatrixGridProps) {
   const [modeIndex, setModeIndex] = useState(0);
   const mode = forcedMode ?? modeSequence[modeIndex];
 
@@ -158,8 +160,14 @@ export function MatrixGrid({ className, forcedMode }: MatrixGridProps) {
   }, []);
 
   const frames = mode === "wave" ? waveFrames : mode === "pulse" ? pulseFrames : undefined;
-  const pattern = mode === "omacron" ? oMacronPattern : undefined;
+  const omacronPattern = mode === "omacron" ? oMacronPattern : undefined;
   const isOmacron = mode === "omacron";
+  const isVu = mode === "vu";
+
+  const waveformPattern = useMemo(() => {
+    if (!isVu || !levels || levels.length === 0) return undefined;
+    return waveform(ANIM_ROWS, ANIM_COLS, levels);
+  }, [isVu, levels]);
 
   return (
     <div
@@ -172,7 +180,8 @@ export function MatrixGrid({ className, forcedMode }: MatrixGridProps) {
         rows={ANIM_ROWS}
         cols={ANIM_COLS}
         frames={frames}
-        pattern={pattern}
+        pattern={waveformPattern ?? omacronPattern}
+        mode="default"
         fps={isOmacron ? 10 : 8}
         loop={!isOmacron}
         autoplay={!isOmacron}

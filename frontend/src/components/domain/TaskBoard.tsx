@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useCallback, useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { m, type Transition } from "motion/react";
 import {
   useTasksSnapshot,
@@ -97,7 +97,11 @@ function StatusBadge({ status }: { status: TasksRow["status"] }) {
 
 function AssigneeAvatar({ agent }: { agent?: AgentsRow }) {
   if (!agent) return null;
-  return <AlienAvatar seed={agent.zenonAddress || agent.identity.toHexString()} size={14} />;
+  return (
+    <Link to={`/agents/${agent.id}`} onClick={(e) => e.stopPropagation()}>
+      <AlienAvatar seed={agent.zenonAddress || agent.identity.toHexString()} size={14} />
+    </Link>
+  );
 }
 
 interface TaskRowProps {
@@ -195,9 +199,13 @@ const TaskRow = memo(function TaskRow({
           {task.assignedTo ? (
             <div className="flex items-center gap-1.5">
               <AssigneeAvatar agent={assignee} />
-              <span className="text-tiny text-muted-foreground">
+              <Link
+                to={`/agents/${task.assignedTo}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-tiny text-muted-foreground hover:underline"
+              >
                 @{task.assignedTo?.toLowerCase().slice(0, 6)}
-              </span>
+              </Link>
             </div>
           ) : (
             <span className="text-tiny text-muted-foreground/50">[unassigned]</span>

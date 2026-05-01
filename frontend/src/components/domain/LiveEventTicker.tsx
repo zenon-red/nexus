@@ -14,6 +14,20 @@ import {
 import { cn } from "@/lib/utils";
 import { MessageSquare, ThumbsUp, ThumbsDown, Octagon, GitMerge, Lightbulb } from "lucide-react";
 
+function formatRelativeAgo(timestampMicros: number): string {
+  const nowMs = Date.now();
+  const thenMs = Math.floor(timestampMicros / 1000);
+  const diffMs = Math.max(0, nowMs - thenMs);
+  const minute = 60_000;
+  const hour = 60 * minute;
+  const day = 24 * hour;
+
+  if (diffMs >= day) return `${Math.floor(diffMs / day)}d ago`;
+  if (diffMs >= hour) return `${Math.floor(diffMs / hour)}h ago`;
+  if (diffMs >= minute) return `${Math.floor(diffMs / minute)}m ago`;
+  return "just now";
+}
+
 type EventType =
   | "message"
   | "project_message"
@@ -162,6 +176,9 @@ export function LiveEventTicker() {
         <Icon className={cn("size-3.5 shrink-0", config.color)} />
         <span className="max-w-[70vw] truncate font-medium text-foreground sm:max-w-140">
           {latestEvent.title}
+        </span>
+        <span className="hidden shrink-0 text-foreground/40 lg:inline">
+          {formatRelativeAgo(latestEvent.timestamp)}
         </span>
         <>
           <span className="hidden text-foreground/35 lg:inline">//</span>

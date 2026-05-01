@@ -1,6 +1,7 @@
 use spacetimedb::{ReducerContext, Table, reducer};
 
 pub mod helpers;
+pub mod procedures;
 pub mod reducers;
 pub mod tables;
 pub mod types;
@@ -10,6 +11,7 @@ use crate::tables::agent::{Agent, agents};
 use crate::tables::channel::{Channel, channels};
 use crate::tables::config::{Config, config};
 use crate::tables::evaluation_dimension::{EvaluationDimension, evaluation_dimensions};
+use crate::tables::voice_allowed_host::{VoiceAllowedHost, voice_allowed_hosts};
 use crate::tables::vote::{Vote, votes};
 use crate::types::{AgentStatus, DimensionScore};
 
@@ -87,6 +89,18 @@ pub fn init(ctx: &ReducerContext) {
         ctx.db.config().insert(Config {
             key: "idea_veto_floor".to_string(),
             value: "2".to_string(),
+        });
+    }
+
+    if ctx
+        .db
+        .voice_allowed_hosts()
+        .host()
+        .find("audio.zenon.red".to_string())
+        .is_none()
+    {
+        ctx.db.voice_allowed_hosts().insert(VoiceAllowedHost {
+            host: "audio.zenon.red".to_string(),
         });
     }
 

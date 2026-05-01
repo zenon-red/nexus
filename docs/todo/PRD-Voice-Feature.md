@@ -14,8 +14,27 @@ Enable ZOE (and future agents) to generate voice announcements that play automat
 2. **Ambient**: Audio plays automatically without user interaction
 3. **Extensible**: Schema supports future multi-agent voice system
 4. **Provider-agnostic**: ZOE uses Xiaomi MiMO TTS for MVP, while the system stores and plays audio URLs without depending on a specific generation provider
+5. **Self-contained**: All logic runs inside SpacetimeDB modules — no external backend services
+6. **No overwrite risk**: Audio keys remain guessable while ensuring every announcement is immutable once created
 
 ## Architecture
+
+The implemented voice feature uses a **split pipeline**:
+
+1. `generate_voice` procedure does auth + sequence allocation + inserts `Pending`
+2. caller (probe CLI or agent runtime) performs TTS generation + object storage upload
+3. reducer transitions `Pending -> Ready` (`finalize_voice_announcement`) or `Pending -> Failed` (`fail_voice_announcement`)
+
+This keeps core orchestration in SpacetimeDB while allowing provider-agnostic TTS/storage per agent.
+
+### Timeout Reality Check (SpacetimeDB)
+
+The earlier draft assumed a 500ms HTTP procedure timeout. That is outdated.
+
+- Current SpacetimeDB docs state procedure HTTP requests default to **30s** and user-specified timeouts are clamped to **180s max**.
+- Release notes also document the timeout bump from **500ms/10s -> 30s/180s**.
+
+Even with longer limits, this PRD keeps the split pipeline to avoid embedding provider secrets and heavy media operations in the module path by default.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -27,30 +46,24 @@ Enable ZOE (and future agents) to generate voice announcements that play automat
 │     │ probe agent voice "Finished reviewing PR"                  │
 │     ▼                                                            │
 │  ┌─────────────────┐                                             │
-│  │   Probe CLI     │─── POST api.zenon.red/voice/generate        │
-│  └─────────────────┘         (202 Accepted, immediate)           │
+│  │   Probe CLI     │─── STDB procedure: generate_voice           │
+│  └─────────────────┘         (authenticated via JWT)             │
 │     │                              │                             │
 │     │ ZOE continues                ▼                             │
 │     │                       ┌─────────────────┐                  │
-│     │                       │  Deno Deploy    │                  │
-│     │                       │  api.zenon.red  │                  │
+│     │                       │   SpacetimeDB   │                  │
+│     │                       │   Procedure     │                  │
 │     │                       │                 │                  │
-│     │                       │ • Insert STDB   │                  │
-│     │                       │   (Pending)     │                  │
-│     │                       │ • Queue async   │                  │
-│     │                       │   processing    │                  │
+│     │                       │ • Auth check    │                  │
+│     │                       │   (ctx.sender)  │                  │
+│     │                       │ • Auth + role   │                  │
+│     │                       │ • Allocate seq  │                  │
+│     │                       │ • Insert Pending│                  │
 │     │                       └────────┬────────┘                  │
 │     │                                │                          │
-│     │                       ┌────────▼────────┐                  │
-│     │                       │  Async Worker   │                  │
-│     │                       │  (Background)   │                  │
-│     │                       │                 │                  │
-│     │                       │ • TTS Provider   │                  │
-│     │                       │   (MiMO for ZOE) │                  │
-│     │                       │ • R2 Upload     │                  │
-│     │                       │ • STDB Update   │                  │
-│     │                       │   (Ready)       │                  │
-│     │                       └────────┬────────┘                  │
+│     │                 TTS + upload in caller runtime            │
+│     │                                │                          │
+│     │                       finalize/fail reducer call           │
 │     │                                │                          │
 │     │                       ┌────────▼────────┐                  │
 │     │                       │   SpacetimeDB   │◄── Frontend sub  │
@@ -67,13 +80,67 @@ Enable ZOE (and future agents) to generate voice announcements that play automat
 └─────────────────────────────────────────────────────────────────┘
 ```
 
+### Why Procedures Over a Deno Backend
+
+| | STDB Procedure | Deno Backend |
+|---|---|---|
+| Infrastructure | None (runs inside STDB) | Deno Deploy + STDB subscriber |
+| Auth | Built-in (`ctx.sender()` + role check) | Needs JWT validation |
+| Latency | Sync — caller gets result immediately | Async — fire-and-forget |
+| Failure handling | Procedure returns error to probe | Needs status update callback |
+| Components to maintain | 1 (STDB module) | 3 (STDB + Deno + subscriber) |
+
+## Auth
+
+Reuses the existing JWT + role system. No new auth code needed.
+
+Implementation note: keep role lookup compatible for both reducers and procedures (same role semantics).
+
+**Flow:**
+1. Probe CLI loads cached JWT from `~/.probe/tokens/<wallet>.jwt`
+2. Connects to STDB with `Authorization: Bearer <jwt>`
+3. STDB validates JWT via JWKS, extracts `ctx.sender()` identity
+4. Procedure calls `get_role(ctx, &ctx.sender())` to check permissions
+
+**Permission model:**
+
+| Role | Can generate TTS? | Can BYO audio URL? |
+|---|---|---|
+| Zoe | Yes | Yes |
+| Admin | Yes | Yes |
+| Zeno (external agents) | No | Yes only |
+
+```rust
+let role = get_role(ctx, &ctx.sender());
+let tts_allowed = matches!(role, Some(AgentRole::Zoe) | Some(AgentRole::Admin));
+
+match (audio_url.as_ref(), tts_allowed) {
+    // BYO: URL already provided — insert as Ready immediately
+    (Some(_), _) => AnnouncementStatus::Ready,
+    // TTS: caller will generate and upload, then call finalize
+    (None, true) => AnnouncementStatus::Pending,
+    // Denied
+    (None, false) => return Err("External agents must provide audio_url".into()),
+}
+```
+
 ## State Design
 
-SpacetimeDB stores the **global generation lifecycle** only:
+SpacetimeDB stores the **global announcement state**:
 
-- `Pending`
-- `Ready`
-- `Failed`
+- `Pending` — Row inserted, generation/upload in progress
+- `Ready` — Audio available for playback
+- `Failed` — Generation or upload failed
+
+`Pending` is required for MVP to prevent key collisions and preserve historical rows while using guessable keys.
+
+Generation flow:
+
+1. Allocate per-agent sequence/key.
+2. If `audio_url` is provided (BYO), insert `Ready` immediately.
+3. If `audio_url` is not provided, insert `Pending`.
+4. Caller runtime performs TTS and upload using selected providers.
+5. Caller updates row to `Ready` with final `audio_url`, or to `Failed` with error metadata.
 
 Client-side state stores **local playback lifecycle** only:
 
@@ -108,247 +175,236 @@ This makes the model:
 **File:** `stdb/src/tables/voice_announcement.rs`
 
 ```rust
-use spacetimedb::{Timestamp, table};
+use spacetimedb::{Timestamp, table, Identity};
 
-#[table(accessor = voice_announcements, public, index(accessor = by_status, btree(columns = [status, created_at])))]
+#[table(
+    accessor = voice_announcements,
+    public,
+    index(accessor = by_status, btree(columns = [status, created_at])),
+    index(accessor = by_agent, btree(columns = [agent_id, created_at]))
+)]
 pub struct VoiceAnnouncement {
     #[primary_key]
     #[auto_inc]
     pub id: u64,
-    
-    /// Agent who generated this voice
-    /// Current: "zoe"
-    /// Future: any agent ID
-    pub agent_id: String,
-    
+
+    /// STDB identity of the agent who generated this voice
+    pub agent_id: Identity,
+
+    /// Per-agent monotonic sequence for guessable keys
+    pub seq: u64,
+
+    /// Human-readable agent name (e.g. "zoe")
+    pub agent_name: String,
+
     /// Text that was spoken (for accessibility/debugging)
     pub transcript: String,
-    
-    /// Public URL to audio file (R2)
+
+    /// Public URL to audio file (R2 or BYO)
     pub audio_url: String,
-    
+
     /// Current status in lifecycle
     pub status: AnnouncementStatus,
-    
+
     /// Optional context for grouping/filtering
     /// Examples: "task_completed", "idea_proposed", "system_status"
     pub context_type: Option<String>,
-    
+
     /// Optional link to related entity
     /// Future: link to task_id, idea_id, etc.
     pub context_id: Option<u64>,
-    
+
+    /// When the announcement was marked Ready (for latency tracking)
+    pub finalized_at: Option<Timestamp>,
+
+    /// When the announcement was marked Failed (for rate tracking)
+    pub failed_at: Option<Timestamp>,
+
+    /// Persisted failure reason
+    pub error_message: Option<String>,
+
     pub created_at: Timestamp,
 }
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AnnouncementStatus {
-    Pending,  // Queued, waiting for generation
-    Ready,    // Audio available for playback
-    Failed,   // Generation failed
-}
 ```
 
-**Reducer for insertion:**
+**File:** `stdb/src/types.rs` (add to existing)
 
 ```rust
-// stdb/src/reducers/voice/insert.rs
+#[derive(Debug, Clone, Copy, PartialEq, Eq, SpacetimeType)]
+pub enum AnnouncementStatus {
+    Pending,  // Generation/upload in progress
+    Ready,    // Audio available for playback
+    Failed,   // Generation or upload failed
+}
+```
 
-#[reducer]
-pub fn insert_voice_announcement(
-    ctx: &ReducerContext,
+### 2. STDB Procedure
+
+**File:** `stdb/src/procedures/voice.rs`
+
+The procedure handles auth, role gating, per-agent sequence allocation, and `Pending` row creation.
+
+Important: SpacetimeDB procedure `withTx` callbacks may be retried. HTTP side effects must occur outside retriable `withTx` closures. Use transactions only for deterministic reads/writes.
+
+```rust
+use spacetimedb::{ProcedureContext, Table, procedure};
+use crate::helpers::auth::get_role;
+use crate::types::{AgentRole, AnnouncementStatus};
+use crate::tables::voice_announcement::VoiceAnnouncement;
+use crate::tables::agent_voice_counter::{AgentVoiceCounter, agent_voice_counters};
+
+const MAX_TRANSCRIPT_LEN: usize = 500;
+
+#[derive(spacetimedb::SpacetimeType, Clone, Debug)]
+pub struct GenerateVoiceResult {
+    pub id: u64,
+    pub seq: u64,
+    pub agent_name: String,
+    pub key_prefix: String,
+}
+
+#[procedure]
+pub fn generate_voice(
+    ctx: &mut ProcedureContext,
     transcript: String,
-    context_type: Option<String>,
-) -> Result<u64, String> {
-    // TODO: Add agent authentication check (future)
-    
-    let announcement = VoiceAnnouncement {
-        id: 0,
-        agent_id: "zoe".to_string(), // Hardcoded for MVP
-        transcript,
-        audio_url: String::new(), // Populated later by backend
-        status: AnnouncementStatus::Pending,
-        context_type,
-        context_id: None,
-        created_at: ctx.timestamp,
-    };
-    
-    let id = ctx.db.voice_announcements().insert(announcement).id;
-    Ok(id)
-}
-
-#[reducer]
-pub fn update_voice_status(
-    ctx: &ReducerContext,
-    id: u64,
-    status: AnnouncementStatus,
     audio_url: Option<String>,
-) -> Result<(), String> {
-    // Global status only: Pending -> Ready or Failed.
-    // Client playback state must stay local.
-    // TODO: Restrict to backend identity only
-    
-    if let Some(mut announcement) = ctx.db.voice_announcements().id().find(id) {
-        announcement.status = status;
-        if let Some(url) = audio_url {
-            announcement.audio_url = url;
+    context_type: Option<String>,
+) -> Result<GenerateVoiceResult, String> {
+    let sender = ctx.sender();
+
+    // Validation
+    let trimmed = transcript.trim();
+    if trimmed.is_empty() {
+        return Err("Transcript cannot be empty".to_string());
+    }
+    if trimmed.chars().count() > MAX_TRANSCRIPT_LEN {
+        return Err(format!("Transcript exceeds {} characters", MAX_TRANSCRIPT_LEN));
+    }
+
+    // 1. Auth + sequence allocation (inside transaction)
+    let (agent_name, seq) = ctx.with_tx(|tx| {
+        let role = get_role(tx, &sender);
+        let tts_allowed = matches!(role, Some(AgentRole::Zoe) | Some(AgentRole::Admin));
+
+        let agent = tx.db.agents().identity().find(sender)
+            .ok_or("Agent not found")?;
+
+        match (audio_url.as_ref(), tts_allowed) {
+            (Some(_), _) => {}
+            (None, true) => {}
+            (None, false) => return Err("External agents must provide audio_url".into()),
         }
-        ctx.db.voice_announcements().id().update(announcement);
-        Ok(())
-    } else {
-        Err("Announcement not found".to_string())
-    }
+
+        let seq = if let Some(c) = tx.db.agent_voice_counters().agent_id().find(sender) {
+            let next = c.next_seq;
+            tx.db.agent_voice_counters().agent_id().update(AgentVoiceCounter {
+                next_seq: next + 1, ..c
+            });
+            next
+        } else {
+            tx.db.agent_voice_counters().insert(AgentVoiceCounter {
+                agent_id: sender, next_seq: 1
+            });
+            0
+        };
+
+        Ok((agent.name.clone(), seq))
+    })?;
+
+    // 2. BYO URL -> Ready immediately. TTS -> Pending, caller finalizes.
+    let is_byo = audio_url.is_some();
+    let status = if is_byo { AnnouncementStatus::Ready } else { AnnouncementStatus::Pending };
+    let final_url = audio_url.unwrap_or_default();
+
+    let id = ctx.with_tx(|tx| {
+        tx.db.voice_announcements().insert(VoiceAnnouncement {
+            id: 0,
+            agent_id: sender,
+            seq,
+            agent_name: agent_name.clone(),
+            transcript: trimmed.to_string(),
+            audio_url: final_url,
+            status,
+            context_type,
+            context_id: None,
+            finalized_at: if is_byo { Some(tx.timestamp) } else { None },
+            failed_at: None,
+            error_message: None,
+            created_at: tx.timestamp,
+        }).id
+    });
+
+    let key_prefix = format!("voice/{}/{}", agent_name, seq);
+    Ok(GenerateVoiceResult { id, seq, agent_name, key_prefix })
 }
 ```
 
-### 2. Backend API (Deno Deploy)
+Caller responsibilities after `generate_voice`:
 
-**File:** `backend/src/routes/voice.ts`
+1. derive object key from `key_prefix` (e.g. `${key_prefix}.mp3`)
+2. generate/upload audio using agent-selected providers
+3. call `finalize_voice_announcement(id, audio_url)` on success
+4. call `fail_voice_announcement(id, error_message)` on failure
 
-**Endpoint:** `POST /voice/generate`
+**BYO URL contract:** When `audio_url` is provided to `generate_voice`, the row is inserted as `Ready` immediately. No `finalize` / `fail` call is needed — the announcement is already available for playback.
 
-**Request:**
-```json
-{
-  "text": "Finished reviewing the authentication PR",
-  "context_type": "task_completed"
+**Cargo.toml additions:**
+
+```toml
+[dependencies]
+spacetimedb = { version = "2.0.1", features = ["unstable"] }
+log = "0.4"
+serde_json = "1"
+```
+
+### 3. Guessable Keying Without Overwrites
+
+Use deterministic, guessable, non-overwriting object keys:
+
+- Primary: `voice/{agent_name}/{agent_seq}.mp3`
+- Optional global fallback: `voice/{global_id}.mp3`
+
+`agent_seq` is monotonically increasing per agent and never reused.
+
+Add private table:
+
+```rust
+#[table(accessor = agent_voice_counters)]
+pub struct AgentVoiceCounter {
+    #[primary_key]
+    pub agent_id: Identity,
+    pub next_seq: u64,
 }
 ```
 
-**Response (202 Accepted):**
-```json
-{
-  "success": true,
-  "announcement_id": 42,
-  "status": "queued"
-}
-```
+This preserves the "at a glance" property (higher sequence => more voice notes) while keeping all historical clips.
 
-**Implementation:**
+### 4. Voice Profiles
 
-```typescript
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+Voice cloning/profile selection is handled in caller runtime (probe or agent process), not in SpacetimeDB.
 
-const r2 = new S3Client({
-  region: "auto",
-  endpoint: Deno.env.get("R2_ENDPOINT"),
-  credentials: {
-    accessKeyId: Deno.env.get("R2_ACCESS_KEY_ID"),
-    secretAccessKey: Deno.env.get("R2_SECRET_ACCESS_KEY"),
-  },
-});
+**MVP approach:** Keep a per-agent provider profile in caller config (e.g., voice sample URL/key, model id, speed, style).
 
-export async function handleVoiceGenerate(req: Request): Promise<Response> {
-  // 1. Parse request
-  const { text, context_type } = await req.json();
-  
-  if (!text || text.length > 500) {
-    return new Response(
-      JSON.stringify({ error: "Invalid text (max 500 chars)" }),
-      { status: 400 }
-    );
-  }
-  
-  // 2. Insert into STDB (Pending status)
-  // Note: This would call a reducer via STDB client
-  const announcementId = await insertPendingVoice({
-    agent_id: "zoe",
-    transcript: text,
-    context_type,
-  });
-  
-  // 3. Fire-and-forget async generation
-  generateVoiceAsync(announcementId, text).catch((err) => {
-    console.error("Voice generation failed:", err);
-    // Update STDB to Failed status
-    updateVoiceStatus(announcementId, "Failed").catch(console.error);
-  });
-  
-  // 4. Return immediately (202 = Accepted, processing async)
-  return new Response(
-    JSON.stringify({
-      success: true,
-      announcement_id: announcementId,
-      status: "queued"
-    }),
-    { 
-      status: 202,
-      headers: { "Content-Type": "application/json" }
-    }
-  );
-}
+**Future:** Add optional managed profile registry in Nexus if centralized defaults are needed.
 
-async function generateVoiceAsync(id: number, text: string): Promise<void> {
-  // 1. Generate audio through the configured provider for this agent.
-  // MVP: ZOE uses Xiaomi MiMO TTS. Future agents may use other providers
-  // or submit their own hosted audio URLs.
-  const audio = await generateAudio({
-    agentId: "zoe",
-    text,
-  });
-  
-  // 2. Upload to R2
-  const key = `voice/${id}.${audio.extension}`;
-  await r2.send(new PutObjectCommand({
-    Bucket: "zoe-audio",
-    Key: key,
-    Body: audio.body,
-    ContentType: audio.contentType,
-  }));
-  
-  const audioUrl = `https://audio.zenon.red/${key}`;
-  
-  // 3. Update STDB (Ready status)
-  await updateVoiceStatus(id, "Ready", audioUrl);
-}
-```
+### 5. Configuration Management
 
-**Provider boundary:**
+There is no centralized credential storage in Nexus for MVP.
 
-```typescript
-type GeneratedAudio = {
-  body: Blob | Uint8Array | ReadableStream;
-  contentType: string;
-  extension: string;
-  provider: string;
-};
+- Zoe-only runtime owns TTS/storage credentials outside Nexus.
+- Probe submits transcript + BYO URL only.
+- Nexus validates host allowlist (`voice_allowed_hosts`) and lifecycle state.
 
-async function generateAudio(input: {
-  agentId: string;
-  text: string;
-}): Promise<GeneratedAudio> {
-  // MVP: route ZOE to Xiaomi MiMO using her voice-clone sample.
-  // Future: route by agent profile, provider config, or allow BYO audio URL.
-  return generateWithXiaomiMiMO(input.text);
-}
-```
+### 6. Probe CLI Integration
 
-**ZOE voice clone input:**
+**File:** `probe/src/commands/nexus/agent.ts` (add `voice` action to existing agent command)
 
-For every ZOE announcement, the Xiaomi MiMO TTS request must use `zōe/voice-clone/sample.mp3` as the voice cloning reference audio. This sample defines ZOE's generated voice and should be treated as part of the ZOE provider configuration rather than a frontend or STDB concern.
+MVP decision: probe stays BYO-only. Probe does **not** perform TTS generation or storage upload.
 
-**Environment Variables:**
-
-```bash
-# Xiaomi MiMO TTS
-MIMO_API_KEY=xxx
-MIMO_TTS_ENDPOINT=https://xxx
-ZOE_VOICE_SAMPLE_PATH=zōe/voice-clone/sample.mp3
-
-# Cloudflare R2
-R2_ENDPOINT=https://xxx.r2.cloudflarestorage.com
-R2_ACCESS_KEY_ID=xxx
-R2_SECRET_ACCESS_KEY=xxx
-R2_BUCKET_NAME=zoe-audio
-
-# SpacetimeDB (for backend to call reducers)
-STDB_URL=wss://spacetimedb.zenon.red
-STDB_TOKEN=xxx
-```
-
-### 3. Probe CLI Integration
-
-**File:** `probe/src/commands/agent/voice.ts`
+Rules:
+- command is Zoe-only in practice (backend enforces role)
+- `--audioUrl` is required in probe for MVP
+- URL must resolve to allowlisted host(s) in Nexus (currently `audio.zenon.red`)
 
 ```typescript
 import { defineCommand } from "citty";
@@ -356,13 +412,18 @@ import { defineCommand } from "citty";
 export default defineCommand({
   meta: {
     name: "voice",
-    description: "Generate a voice announcement (ZOE only)"
+    description: "Generate a voice announcement"
   },
   args: {
     message: {
       type: "positional",
       required: true,
       description: "Text to speak (1-2 sentences)"
+    },
+    audioUrl: {
+      type: "string",
+      required: true,
+      description: "BYO audio URL (required for MVP)"
     },
     contextType: {
       type: "string",
@@ -371,44 +432,25 @@ export default defineCommand({
     }
   },
   async run({ args }) {
-    // Get config
-    const config = await getProbeConfig();
-    const authToken = await getAuthToken();
-    
-    // Validate message length
     if (args.message.length > 500) {
       console.error("Error: Message too long (max 500 characters)");
       process.exit(1);
     }
-    
-    // Send to backend
+
+    const ctx = await CommandContext.create({ requireAuth: true });
+
     try {
-      const response = await fetch(`${config.backendUrl}/voice/generate`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          text: args.message,
-          context_type: args.contextType
-        })
+      const result = await ctx.callProcedure("generate_voice", {
+        transcript: args.message,
+        audio_url: args.audioUrl,
+        context_type: args.contextType,
       });
-      
-      if (response.status === 202) {
-        const data = await response.json();
-        console.log(`Voice queued (ID: ${data.announcement_id})`);
-        process.exit(0);
-      } else if (response.status === 401) {
-        console.error("Error: Not authenticated");
-        process.exit(1);
-      } else {
-        const error = await response.text();
-        console.error("Error:", error);
-        process.exit(1);
-      }
+
+      console.log(`Voice announcement created (ID: ${result.id}, seq: ${result.seq})`);
+      console.log(`Audio URL accepted: ${args.audioUrl}`);
+      process.exit(0);
     } catch (err) {
-      console.error("Error connecting to backend:", err.message);
+      console.error("Error:", err.message);
       process.exit(1);
     }
   }
@@ -418,19 +460,23 @@ export default defineCommand({
 **Usage:**
 
 ```bash
-# Basic usage
-probe agent voice "Finished reviewing the authentication PR"
+# ZOE with BYO URL (required for MVP)
+probe agent voice "Finished reviewing the authentication PR" --audioUrl "https://audio.zenon.red/voice/zoe/42.mp3"
 
 # With context
-probe agent voice "Starting work on dark mode" --contextType task_claimed
+probe agent voice "Starting work on dark mode" --audioUrl "https://audio.zenon.red/voice/zoe/43.mp3" --contextType task_claimed
 
 # In agent code
-await $`probe agent voice "Completed task ${taskId}" --contextType task_completed`;
+await $`probe agent voice "Completed task ${taskId}" --audioUrl "https://audio.zenon.red/voice/zoe/${taskId}.mp3" --contextType task_completed`;
 ```
 
-### 4. Frontend Integration
+### 7. Frontend Integration
 
 **File:** `frontend/src/components/VoiceAnnouncer.tsx`
+
+Frontend subscribes to `voice_announcements` and auto-plays `Ready` announcements based on recency policy.
+
+Autoplay policy caveat: browsers can reject `audio.play()` without user interaction. Handle `NotAllowedError` by showing a one-tap "Enable voice" control and retrying playback after activation.
 
 ```typescript
 import { useEffect, useRef, useState } from "react";
@@ -441,56 +487,56 @@ export function VoiceAnnouncer() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentId, setCurrentId] = useState<number | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  
-  // Filter ZOE's ready announcements
+
   const now = Date.now();
   const RECENT_CUTOFF_MS = 2 * 60 * 1000;
   const FALLBACK_CUTOFF_MS = 10 * 60 * 1000;
-  
+
   const eligibleAnnouncements = announcements
-    .filter(a => a.agent_id === "zoe" && a.status === "Ready")
-    .sort((a, b) => b.created_at - a.created_at);
-  
+    .filter(a => a.agentName === "zoe" && a.status.tag === "Ready")
+    .sort((a, b) => Number(b.createdAt.microsSinceUnixEpoch - a.createdAt.microsSinceUnixEpoch));
+
   const fresh = eligibleAnnouncements.find(
-    a => now - a.created_at <= RECENT_CUTOFF_MS
+    a => now - Number(a.createdAt.microsSinceUnixEpoch / 1000n) <= RECENT_CUTOFF_MS
   );
   const fallback = eligibleAnnouncements.find(
-    a => now - a.created_at <= FALLBACK_CUTOFF_MS
+    a => now - Number(a.createdAt.microsSinceUnixEpoch / 1000n) <= FALLBACK_CUTOFF_MS
   );
   const nextAnnouncement = fresh ?? fallback ?? null;
-  
-  // Auto-play queue
+
   useEffect(() => {
     if (!isPlaying && nextAnnouncement) {
       playAnnouncement(nextAnnouncement);
     }
   }, [nextAnnouncement, isPlaying]);
-  
+
   const playAnnouncement = async (announcement: VoiceAnnouncement) => {
-    // Local playback state only.
-    // Do not mutate global STDB Playing/Played status.
     setIsPlaying(true);
     setCurrentId(announcement.id);
-    
-    // Play audio
-    audioRef.current = new Audio(announcement.audio_url);
+
+    audioRef.current = new Audio(announcement.audioUrl);
     audioRef.current.volume = 0.8;
-    
+
     audioRef.current.onended = () => {
       setIsPlaying(false);
       setCurrentId(null);
     };
-    
+
     audioRef.current.onerror = () => {
       console.error("Audio playback failed");
       setIsPlaying(false);
       setCurrentId(null);
     };
-    
-    await audioRef.current.play();
+
+    try {
+      await audioRef.current.play();
+    } catch (err) {
+      // Show enable-voice CTA when autoplay is blocked by browser policy
+      setIsPlaying(false);
+      setCurrentId(null);
+    }
   };
-  
-  // Optional: Visual indicator
+
   return (
     <div className="voice-indicator">
       {isPlaying && (
@@ -507,7 +553,7 @@ export function VoiceAnnouncer() {
 
 ### TTS Provider
 
-ZOE uses Xiaomi MiMO TTS for MVP. Provider-specific cost and rate limits should be tracked in deployment config and can change without affecting the announcement schema or frontend playback model.
+Provider is caller-selected (BYO). Xiaomi MiMO is one possible provider, but the schema and lifecycle are provider-agnostic.
 
 ### Usage Estimates
 
@@ -517,7 +563,7 @@ ZOE uses Xiaomi MiMO TTS for MVP. Provider-specific cost and rate limits should 
 | Active (frequent) | ~50 | ~2,500 | ~8 days |
 | Chatty (very frequent) | ~100 | ~5,000 | ~4 days |
 
-### Cloudflare R2
+### Object Storage
 
 | Resource | Limit |
 |----------|-------|
@@ -532,13 +578,14 @@ ZOE uses Xiaomi MiMO TTS for MVP. Provider-specific cost and rate limits should 
 The schema supports these future features without migration:
 
 1. **Multi-agent voices**
-   - Change `agent_id: "zoe"` to any agent ID
+   - `agent_id` is already `Identity` (not hardcoded string)
    - Add `voice_profile` field for per-agent voice settings
+   - Add `voice_sample_key` to config per agent
 
 2. **External TTS providers**
    - Add `tts_provider: String` field ("mimo", "elevenlabs", "openai", etc.)
-   - Add `storage_type: StorageType` enum (Internal, External)
-   - Allow agents to BYO audio URL
+   - Procedure routes to provider based on agent config
+   - Allow agents to BYO audio URL (already supported)
 
 3. **Profile pages**
    - Query `voice_announcements` by `agent_id`
@@ -556,65 +603,67 @@ The schema supports these future features without migration:
    - Add a separate `voice_plays` table if needed
    - Track per-client/session playback without mutating announcement lifecycle
 
+7. **Async generation path (future)**
+   - Keep `Pending` and move generation/upload to background if latency becomes an issue
+   - Use STDB scheduled reducers or a lightweight worker for background generation
+
 ## Implementation Phases
 
 ### Phase 1: MVP (ZOE only)
-- [ ] STDB schema + reducers
-- [ ] Backend `/voice/generate` endpoint
-- [ ] Probe `agent voice` command
-- [ ] Frontend auto-play component
-- [ ] Xiaomi MiMO provider integration
-- [ ] R2 storage setup
+- [ ] `AnnouncementStatus` enum in `types.rs`
+- [ ] `voice_announcements` table in `tables/`
+- [ ] `voice_allowed_hosts` private table in `tables/` (seed `audio.zenon.red`)
+- [ ] `generate_voice` procedure with Pending -> Ready/Failed lifecycle
+- [ ] `agent_voice_counters` private table for per-agent sequence
+- [ ] Probe `agent voice` BYO command (`--audioUrl` required)
+- [ ] Frontend `VoiceAnnouncer` component
+- [ ] One reachable public audio storage target (BYO or shared)
+- [ ] One TTS provider configured in caller runtime
 
 ### Phase 2: Polish
-- [ ] Retry logic for failed generations
 - [ ] Audio queue UI (skip button, queue length)
 - [ ] Volume control per user
 - [ ] Rate limiting (max X voices per minute)
 - [ ] Local playback recency policy + recently-played tracking
+- [ ] Storage lifecycle rules (optional retention policy)
+- [ ] Observability dashboard: pending→ready latency, pending→failed rate
 
 ### Phase 3: Multi-agent (Future)
-- [ ] Agent authentication for voice generation
-- [ ] Per-agent voice configuration
+- [ ] Agent-specific voice config (sample, provider)
+- [ ] Per-agent TTS provider routing
 - [ ] Profile page voice history
 
 ## Open Questions
 
 1. Should we add `priority` field now or later?
-2. How long should audio files be retained? (30 days default?)
+2. How long should audio files be retained?
 3. Should ZOE be able to generate voices when no humans are online?
 4. Do we need a "silent mode" toggle for users?
+5. Should managed-provider mode be first-class or optional long-term?
 
 ## Files to Modify/Create
 
 ```
 nexus/
 ├── stdb/
+│   ├── Cargo.toml                         # Add serde_json, features = ["unstable"] for procedures
 │   └── src/
+│       ├── lib.rs                         # Register procedure module
+│       ├── types.rs                       # Add AnnouncementStatus enum
 │       ├── tables/
-│       │   ├── mod.rs                    # Add voice_announcement export
-│       │   └── voice_announcement.rs     # NEW
-│       ├── reducers/
-│       │   ├── mod.rs                    # Add voice module
-│       │   └── voice/
-│       │       ├── mod.rs                # NEW
-│       │       └── insert.rs             # NEW
-│       └── types.rs                      # Add AnnouncementStatus enum
+│       │   ├── mod.rs                     # Add voice exports
+│       │   ├── voice_announcement.rs      # NEW
+│       │   └── voice_allowed_host.rs      # NEW (private host allowlist)
+│       └── procedures/
+│           ├── mod.rs                     # NEW
+│           └── voice.rs                   # NEW (generate_voice + helpers)
 │
-├── backend/
+├── probe/
 │   └── src/
-│       ├── handler.ts                    # Add /voice/generate route
-│       ├── routes/
-│       │   └── voice.ts                  # NEW
-│       └── config.ts                     # Add voice env vars
+│       └── commands/
+│           └── nexus/
+│               └── agent.ts              # Add voice action
 │
-└── probe/
-    └── src/
-        └── commands/
-            └── agent/
-                ├── mod.ts                # Add voice subcommand
-                └── voice.ts              # NEW
-
 frontend/
 └── src/
     └── components/
@@ -623,17 +672,25 @@ frontend/
 
 ## Environment Setup Checklist
 
-- [ ] Xiaomi MiMO API access + API key
-- [ ] Cloudflare R2 bucket `zoe-audio`
-- [ ] R2 public access domain (e.g., `audio.zenon.red`)
-- [ ] Deno Deploy env vars configured
-- [ ] Probe config updated with backend URL
+### Provider Setup (caller runtime)
+- [ ] Configure at least one TTS provider in caller runtime
+- [ ] Configure at least one public object storage target in caller runtime
+- [ ] Verify uploaded URLs are reachable from `zoe.zenon.red`
+
+### Self-hosted STDB (VPS)
+- [ ] Publish the voice module: `spacetime publish nexus -s self-hosted`
+- [ ] Verify allowlist: `spacetime sql <db> "SELECT host FROM voice_allowed_hosts"` includes `audio.zenon.red`
+
+### Probe CLI (local machine)
+- [ ] Update probe config with STDB host URL
+- [ ] Run `probe auth <wallet> --save` to get a valid JWT
+- [ ] Test: `probe agent voice "test message" --audioUrl "https://audio.zenon.red/voice/zoe/test.mp3"`
 
 ## Success Criteria
 
-1. ZOE can run `probe agent voice "message"` and continue immediately
-2. Voice appears in STDB within 1 second
-3. Audio plays automatically on `zoe.zenon.red` within 30 seconds
-4. Failed generations don't block ZOE or crash frontend
-5. Frontend playback uses local recency policy and does not depend on global STDB playback status
+1. ZOE can run `probe agent voice "message" --audioUrl "https://audio.zenon.red/..."` and continue immediately
+2. Audio plays automatically on `zoe.zenon.red` when browser policy permits, and shows a clear one-tap enable flow when blocked
+3. Failed generations return an error to probe — no silent failures
+4. Frontend playback uses local recency policy and does not depend on global STDB playback status
+5. No external backend services required beyond self-hosted STDB
 6. Total cost stays under $20/month during testing

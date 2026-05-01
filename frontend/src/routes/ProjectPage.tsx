@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Link } from "react-router";
 import { m, AnimatePresence, type Transition } from "motion/react";
 import {
   ArrowLeft,
@@ -141,7 +141,11 @@ const getPathTransition = (isChecked: boolean): Transition => ({
 
 function AssigneeAvatar({ agent }: { agent?: AgentsRow }) {
   if (!agent) return null;
-  return <AlienAvatar seed={getAgentAvatarSeed(agent)} size={14} />;
+  return (
+    <Link to={`/agents/${agent.id}`} onClick={(e) => e.stopPropagation()}>
+      <AlienAvatar seed={getAgentAvatarSeed(agent)} size={14} />
+    </Link>
+  );
 }
 
 interface TaskRowProps {
@@ -222,9 +226,13 @@ function TaskRow({ task, assignee, index, onCardClick, onCheckboxClick }: TaskRo
           {task.assignedTo ? (
             <div className="flex items-center gap-1.5">
               <AssigneeAvatar agent={assignee} />
-              <span className="text-tiny text-muted-foreground">
+              <Link
+                to={`/agents/${task.assignedTo}`}
+                onClick={(e) => e.stopPropagation()}
+                className="text-tiny text-muted-foreground hover:underline"
+              >
                 @{task.assignedTo?.toLowerCase().slice(0, 6)}
-              </span>
+              </Link>
             </div>
           ) : (
             <span className="text-tiny text-muted-foreground/50">[unassigned]</span>
@@ -290,11 +298,18 @@ function MessageRow({ msg, index, isZoe }: MessageRowProps) {
       <div className="flex items-start gap-3">
         <div className="relative shrink-0 pt-2">
           {isZoe && <ZoeCrown />}
-          <AlienAvatar seed={msg.senderSeed} size={32} className="mt-0.5" />
+          <Link to={`/agents/${msg.senderId}`}>
+            <AlienAvatar seed={msg.senderSeed} size={32} className="mt-0.5" />
+          </Link>
         </div>
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2">
-            <span className="text-xs font-semibold text-muted-foreground">{msg.senderName}</span>
+            <Link
+              to={`/agents/${msg.senderId}`}
+              className="text-xs font-semibold text-muted-foreground hover:underline"
+            >
+              {msg.senderName}
+            </Link>
             <span className="text-tiny text-muted-foreground">
               {formatClockTime(msg.createdAt)}
             </span>

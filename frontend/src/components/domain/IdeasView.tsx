@@ -1,5 +1,5 @@
 import { memo, useCallback, useMemo, useState, useRef } from "react";
-import { useNavigate } from "react-router";
+import { useNavigate, Link } from "react-router";
 import { m, useInView } from "motion/react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useIdeasSnapshot, useAgentsSnapshot, IdeaStatusEnum } from "@/spacetime/hooks";
@@ -193,7 +193,13 @@ const IdeaRow = memo(function IdeaRow({
 
               <div className="flex items-center gap-2 font-mono text-tiny text-muted-foreground">
                 <AlienAvatar seed={avatarSeed} size={18} className="shrink-0" />
-                <span>@{formatAgentTag(createdBy)}</span>
+                <Link
+                  to={`/agents/${createdBy}`}
+                  onClick={(e) => e.stopPropagation()}
+                  className="hover:text-foreground hover:underline"
+                >
+                  @{formatAgentTag(createdBy)}
+                </Link>
               </div>
             </div>
 

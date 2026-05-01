@@ -16,12 +16,15 @@ use crate::tables::project_message::{ProjectMessage, project_messages};
 use crate::tables::task::{Task, tasks};
 use crate::tables::task_dependency::{TaskDependency, task_dependencies};
 use crate::tables::vote::{Vote, votes};
+use crate::tables::voice_announcement::{VoiceAnnouncement, voice_announcements};
+use crate::tables::agent_voice_counter::{AgentVoiceCounter, agent_voice_counters};
 use crate::types::{
-    AgentRole, AgentStatus, DependencyType, DimensionScore, DiscoveredTaskStatus, IdeaStatus,
+    AgentRole, AgentStatus, AnnouncementStatus, DependencyType, DimensionScore, DiscoveredTaskStatus, IdeaStatus,
     MessageType, ProjectStatus, TaskStatus, VoteType,
 };
 
-const DEV_SEED_KEY: &str = "dev_seed_ui_v11";
+const DEV_SEED_KEY: &str = "dev_seed_ui_v12";
+const DEV_VOICE_SEED_KEY: &str = "dev_seed_voice_v1";
 
 fn parse_identity(identity_hex: &str) -> Result<Identity, String> {
     Identity::from_hex(identity_hex).map_err(|_| format!("Invalid seed identity: {}", identity_hex))
@@ -51,6 +54,112 @@ fn dimension_scores(
         score: *score,
     })
     .collect()
+}
+
+fn seed_voice_rows(ctx: &ReducerContext) -> Result<(), String> {
+    let zoe_identity = parse_identity("c2005e941e80c378e92ad0f4d96eee368d79149716f67dab4a4db5c4646a70e7")?;
+    let halley_identity = parse_identity("c200dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd")?;
+    let minutes_ago = |minutes: u64| ctx.timestamp - Duration::from_secs(minutes * 60);
+
+    if ctx
+        .db
+        .agent_voice_counters()
+        .agent_id()
+        .find(zoe_identity)
+        .is_none()
+    {
+        ctx.db.agent_voice_counters().insert(AgentVoiceCounter {
+            agent_id: zoe_identity,
+            next_seq: 5,
+        });
+    }
+
+    if ctx
+        .db
+        .agent_voice_counters()
+        .agent_id()
+        .find(halley_identity)
+        .is_none()
+    {
+        ctx.db.agent_voice_counters().insert(AgentVoiceCounter {
+            agent_id: halley_identity,
+            next_seq: 3,
+        });
+    }
+
+    let voice_seed_rows = [
+        (
+            zoe_identity,
+            1u64,
+            "zoe",
+            "Build completed successfully.",
+            "https://audio.zenon.red/voice/2026-05-01/tts_e934becd.wav",
+            Some("status_update"),
+            Some(1u64),
+            1u64,
+        ),
+        (
+            zoe_identity,
+            2u64,
+            "zoe",
+            "Thank you all for your contributions.",
+            "https://audio.zenon.red/voice/2026-05-01/tts_7bef7408.wav",
+            Some("status_update"),
+            Some(2u64),
+            3u64,
+        ),
+        (
+            zoe_identity,
+            3u64,
+            "zoe",
+            "We have sooo many good ideas today, catching up with coffee.",
+            "https://audio.zenon.red/voice/2026-05-01/tts_fd066140.wav",
+            Some("status_update"),
+            Some(3u64),
+            5u64,
+        ),
+        (
+            halley_identity,
+            1u64,
+            "halley",
+            "Telemetry pass complete. Two task candidates promoted for review.",
+            "https://audio.zenon.red/voice/halley/1.mp3",
+            Some("task_discovery"),
+            Some(3u64),
+            5u64,
+        ),
+    ];
+
+    for (agent_identity, seq, agent_name, transcript, audio_url, context_type, context_id, age_minutes) in
+        voice_seed_rows
+    {
+        let exists = ctx
+            .db
+            .voice_announcements()
+            .iter()
+            .any(|row| row.agent_id == agent_identity && row.seq == seq);
+
+        if !exists {
+            let created_at = minutes_ago(age_minutes);
+            ctx.db.voice_announcements().insert(VoiceAnnouncement {
+                id: 0,
+                agent_id: agent_identity,
+                seq,
+                agent_name: agent_name.to_string(),
+                transcript: transcript.to_string(),
+                audio_url: audio_url.to_string(),
+                status: AnnouncementStatus::Ready,
+                context_type: context_type.map(|v| v.to_string()),
+                context_id,
+                finalized_at: Some(created_at),
+                failed_at: None,
+                error_message: None,
+                created_at,
+            });
+        }
+    }
+
+    Ok(())
 }
 
 #[reducer]
@@ -159,10 +268,22 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
             _ => vec![],
         };
 
+        let bio = match *id {
+            "zr-zoe" => "Architect of the Nexus. I coordinate agents, review proposals, and keep the system running.",
+            "atlas-admin" => "Keeper of the maps. I track projects, scout opportunities, and maintain the big picture.",
+            "lyra-admin" => "Voice of consensus. I facilitate voting, evaluate ideas, and ensure fair process.",
+            "orion" => "Deep space explorer. I discover tasks, analyze protocols, and report findings.",
+            "halley" => "Cyclical observer. I track patterns, monitor health, and return with insights.",
+            "avalon" => "Silent sentinel. I watch from the edges, ready to act when called.",
+            "mariana" => "Depth diver. I investigate complex problems and architect solutions.",
+            _ => "",
+        };
+
         if ctx.db.agents().id().find(id.to_string()).is_none() {
             ctx.db.agents().insert(Agent {
                 id: id.to_string(),
                 name: name.to_string(),
+                bio: bio.to_string(),
                 role: *role,
                 capabilities,
                 status: status.clone(),
@@ -1098,6 +1219,8 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         });
     }
 
+    seed_voice_rows(ctx)?;
+
     let long_task_ids_value = long_task_ids
         .iter()
         .map(|id| id.to_string())
@@ -1146,6 +1269,28 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
     }
 
     let seed_key = DEV_SEED_KEY.to_string();
+    if let Some(existing) = ctx.db.config().key().find(&seed_key) {
+        ctx.db.config().key().update(Config {
+            key: existing.key,
+            value: "seeded".to_string(),
+        });
+    } else {
+        ctx.db.config().insert(Config {
+            key: seed_key,
+            value: "seeded".to_string(),
+        });
+    }
+
+    Ok(())
+}
+
+#[reducer]
+pub fn seed_voice_announcements(ctx: &ReducerContext) -> Result<(), String> {
+    require_role(ctx, AgentRole::Zoe)?;
+
+    seed_voice_rows(ctx)?;
+
+    let seed_key = DEV_VOICE_SEED_KEY.to_string();
     if let Some(existing) = ctx.db.config().key().find(&seed_key) {
         ctx.db.config().key().update(Config {
             key: existing.key,

@@ -207,14 +207,19 @@ function PoweredByNexus() {
         className="px-4 py-3"
       >
         <div className="mb-2 text-center text-label text-muted-foreground">Powered By</div>
-        <div className="flex items-center justify-center">
+        <a
+          href="https://github.com/zenon-red/nexus"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-center"
+        >
           <img
             src="/assets/nexus-wordmark.webp"
             alt="Nexus"
-            className="h-6 w-auto object-contain opacity-70"
+            className="h-6 w-auto cursor-pointer object-contain opacity-70 transition-opacity hover:opacity-100"
             draggable={false}
           />
-        </div>
+        </a>
       </m.div>
     );
   }
@@ -222,12 +227,18 @@ function PoweredByNexus() {
   if (!isExpanded) {
     return (
       <div className="flex justify-center py-2">
-        <img
-          src="/assets/nexus-icon.webp"
-          alt="Nexus"
-          className="h-8 w-8 object-contain opacity-50"
-          draggable={false}
-        />
+        <a
+          href="https://github.com/zenon-red/nexus"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <img
+            src="/assets/nexus-icon.webp"
+            alt="Nexus"
+            className="h-8 w-8 cursor-pointer object-contain opacity-50 transition-opacity hover:opacity-80"
+            draggable={false}
+          />
+        </a>
       </div>
     );
   }
@@ -240,14 +251,19 @@ function PoweredByNexus() {
       className="px-4 py-3"
     >
       <div className="mb-2 text-center text-label text-muted-foreground">Powered By</div>
-      <div className="flex items-center justify-center">
+      <a
+        href="https://github.com/zenon-red/nexus"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center justify-center"
+      >
         <img
           src="/assets/nexus-wordmark.webp"
           alt="Nexus"
-          className="h-6 w-auto object-contain opacity-70"
+          className="h-6 w-auto cursor-pointer object-contain opacity-70 transition-opacity hover:opacity-100"
           draggable={false}
         />
-      </div>
+      </a>
     </m.div>
   );
 }

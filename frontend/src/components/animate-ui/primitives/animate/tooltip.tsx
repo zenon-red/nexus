@@ -370,17 +370,22 @@ function shallowEqualWithoutChildren(a?: HTMLMotionProps<"div">, b?: HTMLMotionP
 function TooltipContent({ asChild = false, ...props }: TooltipContentProps) {
   const { setProps, setAsChild } = useTooltip();
   const lastPropsRef = React.useRef<HTMLMotionProps<"div"> | undefined>(undefined);
+  const lastAsChildRef = React.useRef(asChild);
 
   React.useEffect(() => {
-    if (!shallowEqualWithoutChildren(lastPropsRef.current, props)) {
+    const propsChanged = !shallowEqualWithoutChildren(lastPropsRef.current, props);
+    const asChildChanged = lastAsChildRef.current !== asChild;
+
+    if (propsChanged) {
       lastPropsRef.current = props;
       setProps(props);
     }
-  }, [props, setProps]);
 
-  React.useEffect(() => {
-    setAsChild(asChild);
-  }, [asChild, setAsChild]);
+    if (asChildChanged) {
+      lastAsChildRef.current = asChild;
+      setAsChild(asChild);
+    }
+  }, [asChild, props, setAsChild, setProps]);
 
   return null;
 }

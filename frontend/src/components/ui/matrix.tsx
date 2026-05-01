@@ -321,6 +321,39 @@ export function vu(columns: number, levels: number[]): Frame {
   return frame;
 }
 
+export function waveform(rows: number, cols: number, levels: number[]): Frame {
+  const frame = emptyFrame(rows, cols);
+  if (!levels || levels.length === 0) return frame;
+
+  // Interpolate levels to match column count
+  const interpolated = Array.from({ length: cols }, (_, col) => {
+    const t = col / Math.max(1, cols - 1);
+    const idx = t * (levels.length - 1);
+    const i0 = Math.floor(idx);
+    const i1 = Math.min(i0 + 1, levels.length - 1);
+    const frac = idx - i0;
+    const v0 = levels[i0] ?? 0;
+    const v1 = levels[i1] ?? 0;
+    return v0 + (v1 - v0) * frac;
+  });
+
+  for (let col = 0; col < cols; col++) {
+    const level = Math.max(0, Math.min(1, interpolated[col]));
+    // Level 0 = center/bottom, level 1 = top
+    const height = (1 - level) * (rows - 1);
+    const row = Math.floor(height);
+    const frac = height - row;
+
+    if (row >= 0 && row < rows) {
+      setPixel(frame, row, col, 1);
+      if (row > 0) setPixel(frame, row - 1, col, 1 - frac);
+      if (row < rows - 1) setPixel(frame, row + 1, col, frac);
+    }
+  }
+
+  return frame;
+}
+
 export const wave: Frame[] = (() => {
   const frames: Frame[] = [];
   const rows = 7;

@@ -34,6 +34,7 @@ frontend/
 - `/ideas/:id` -> `IdeaPage`
 - `/tasks` -> `TasksListPage`
 - `/projects/:id` -> `ProjectPage`
+- `/agents/:id` -> `AgentProfilePage`
 
 ## Data Flow
 
@@ -41,6 +42,12 @@ frontend/
 2. Pages and components subscribe to tables through `useTable` wrappers in `src/spacetime/hooks.ts`.
 3. Domain components project typed rows into route-local view models.
 4. UI animates transitions with Motion without storing duplicate global state.
+
+## Aggregation Hooks
+
+- `useIdea(ideaId)` — composes ideas, votes, agents, projects, tasks into a single view model.
+- `useProject(projectId)` — composes projects, ideas, tasks, agents, messages into a single view model.
+- `useAgent(agentId)` — composes agents, tasks, ideas, votes, messages, discovered tasks into a single view model with collaborator derivation.
 
 ## Regeneration Contract
 

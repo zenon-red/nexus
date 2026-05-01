@@ -5,6 +5,7 @@ import type {
   Agent,
   AgentRole,
   AgentStatus,
+  AnnouncementStatus,
   Channel,
   DiscoveredTask,
   EvaluationDimension,
@@ -19,6 +20,7 @@ import type {
   ProjectStatus,
   Task,
   TaskStatus,
+  VoiceAnnouncement,
   Vote,
   VoteType,
 } from "@/spacetime/generated/types";
@@ -36,6 +38,7 @@ export type {
   DiscoveredTask as DiscoveredTasksRow,
   ProjectChannel as ProjectChannelsRow,
   ProjectMessage as ProjectMessagesRow,
+  VoiceAnnouncement as VoiceAnnouncementsRow,
 };
 
 export type {
@@ -44,6 +47,7 @@ export type {
   VoteType,
   AgentRole,
   AgentStatus,
+  AnnouncementStatus,
   MessageType,
   ProjectStatus,
   EvaluationDimension,
@@ -145,6 +149,17 @@ export function useProjectMessages() {
   return useMemo(() => [...rows] as ProjectMessage[], [rows]);
 }
 
+export function useVoiceAnnouncements() {
+  const [rows] = useTable(tables.voice_announcements);
+  return useMemo(() => [...rows] as VoiceAnnouncement[], [rows]);
+}
+
+export function useVoiceAnnouncementsSnapshot() {
+  const [rows, isReady] = useTable(tables.voice_announcements);
+  const data = useMemo(() => [...rows] as VoiceAnnouncement[], [rows]);
+  return { rows: data, isReady };
+}
+
 export function useConnectionStatus() {
   const db = useSpacetimeDB();
   return db.isActive;
@@ -224,6 +239,20 @@ export const AgentStatusEnum = {
   },
 
   display(s: AgentStatus): string {
+    return s.tag;
+  },
+} as const;
+
+export const AnnouncementStatusEnum = {
+  values: ["Pending", "Ready", "Failed"] as const,
+
+  is: {
+    pending: (s: AnnouncementStatus) => s.tag === "Pending",
+    ready: (s: AnnouncementStatus) => s.tag === "Ready",
+    failed: (s: AnnouncementStatus) => s.tag === "Failed",
+  },
+
+  display(s: AnnouncementStatus): string {
     return s.tag;
   },
 } as const;

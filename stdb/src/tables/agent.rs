@@ -7,6 +7,7 @@ pub struct Agent {
     #[primary_key]
     pub id: String,
     pub name: String,
+    pub bio: String,
     pub role: AgentRole,
     pub capabilities: Vec<String>,
     pub status: AgentStatus,

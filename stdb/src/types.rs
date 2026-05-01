@@ -236,6 +236,13 @@ pub enum DiscoveredTaskStatus {
     EscalatedToIdea,
 }
 
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum AnnouncementStatus {
+    Pending,
+    Ready,
+    Failed,
+}
+
 impl DiscoveredTaskStatus {
     pub fn as_str(&self) -> &'static str {
         match self {

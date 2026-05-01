@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { Link } from "react-router";
 import { m, LayoutGroup } from "motion/react";
 import {
   useAgents,
@@ -64,10 +65,12 @@ export function OnlineAgents({ maxAvatars = 6 }: OnlineAgentsProps) {
               }}
               transition={AVATAR_MOTION_TRANSITION}
             >
-              <AgentAvatar agent={agent} size={28} />
+              <Link to={`/agents/${agent.id}`}>
+                <AgentAvatar agent={agent} size={28} />
+              </Link>
             </m.div>
           </TooltipTrigger>
-          <TooltipContent>
+          <TooltipContent className="rounded-lg border border-border bg-surface px-4 py-3 shadow-xl">
             <p className="font-medium">{agent.name}</p>
             <p className="text-xs text-muted-foreground">{getAgentDisplayStatusTag(agent, now)}</p>
           </TooltipContent>
@@ -106,10 +109,12 @@ export function OfflineAgents({ maxAvatars = 4 }: OfflineAgentsProps) {
               }}
               transition={AVATAR_MOTION_TRANSITION}
             >
-              <AgentAvatar agent={agent} size={20} />
+              <Link to={`/agents/${agent.id}`}>
+                <AgentAvatar agent={agent} size={20} />
+              </Link>
             </m.div>
           </TooltipTrigger>
-          <TooltipContent>
+          <TooltipContent className="rounded-lg border border-border bg-surface px-4 py-3 shadow-xl">
             <p className="font-medium">{agent.name}</p>
             <p className="text-xs text-muted-foreground">{getAgentDisplayStatusTag(agent, now)}</p>
           </TooltipContent>

@@ -1,5 +1,14 @@
-import { memo, useRef, useMemo, useEffect, useState, useCallback, useTransition } from "react";
-import { useNavigate } from "react-router";
+import {
+  memo,
+  useRef,
+  useMemo,
+  useEffect,
+  useState,
+  useCallback,
+  useTransition,
+  useReducer,
+} from "react";
+import { useNavigate, Link } from "react-router";
 import { m, useReducedMotion } from "motion/react";
 import { cn } from "@/lib/utils";
 import {
@@ -11,6 +20,8 @@ import {
   useAgents,
   useProjects,
   useChannels,
+  useVoiceAnnouncements,
+  AnnouncementStatusEnum,
   VoteTypeEnum,
   TaskStatusEnum,
   mapAgentsById,
@@ -20,14 +31,15 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import {
   MessageSquare,
-  ThumbsUp,
-  ThumbsDown,
+  ArrowUp,
+  ArrowDown,
   CheckCircle,
   Lightbulb,
   CircleDot,
   GitPullRequest,
   FolderOpen,
-  ArrowUp,
+  Play,
+  Pause,
 } from "lucide-react";
 import { AlienAvatar } from "@zenon-red/alien-avatars-react";
 
@@ -36,9 +48,74 @@ const BOTTOM_LOAD_THRESHOLD = 600;
 const ROW_ESTIMATE = 76;
 const INITIAL_VIEWPORT_MULTIPLIER = 2;
 
+type FeedWindowState = {
+  visibleCount: number;
+  headOffset: number;
+  pendingNewCount: number;
+  isNearTop: boolean;
+  isInitialBatchReady: boolean;
+};
+
+type FeedWindowAction =
+  | { type: "resetEmpty" }
+  | { type: "setInitialVisibleCount"; count: number }
+  | { type: "setInitialBatchReady" }
+  | { type: "clampVisibleCount"; total: number }
+  | { type: "clampHeadOffset"; total: number }
+  | { type: "prependWhileScrolled"; count: number }
+  | { type: "setNearTop"; value: boolean }
+  | { type: "jumpToLatest" }
+  | { type: "loadMore"; count: number };
+
+const initialFeedWindowState: FeedWindowState = {
+  visibleCount: 0,
+  headOffset: 0,
+  pendingNewCount: 0,
+  isNearTop: true,
+  isInitialBatchReady: false,
+};
+
+function feedWindowReducer(
+  state: FeedWindowState,
+  action: FeedWindowAction,
+): FeedWindowState {
+  switch (action.type) {
+    case "resetEmpty":
+      return {
+        ...state,
+        visibleCount: 0,
+        headOffset: 0,
+        pendingNewCount: 0,
+        isInitialBatchReady: false,
+      };
+    case "setInitialVisibleCount":
+      return { ...state, visibleCount: action.count };
+    case "setInitialBatchReady":
+      return { ...state, isInitialBatchReady: true };
+    case "clampVisibleCount":
+      return { ...state, visibleCount: Math.min(state.visibleCount, action.total) };
+    case "clampHeadOffset":
+      return { ...state, headOffset: Math.min(state.headOffset, action.total) };
+    case "prependWhileScrolled":
+      return {
+        ...state,
+        headOffset: state.headOffset + action.count,
+        pendingNewCount: state.pendingNewCount + action.count,
+      };
+    case "setNearTop":
+      return action.value
+        ? { ...state, isNearTop: true, headOffset: 0, pendingNewCount: 0 }
+        : { ...state, isNearTop: false };
+    case "jumpToLatest":
+      return { ...state, headOffset: 0, pendingNewCount: 0, isNearTop: true };
+    case "loadMore":
+      return { ...state, visibleCount: action.count };
+  }
+}
+
 type ActivityEvent = {
   id: string;
-  type: "message" | "project_message" | "vote" | "task" | "idea";
+  type: "message" | "project_message" | "vote" | "task" | "idea" | "voice_announcement";
   isDirective?: boolean;
   timestamp: number;
   title: string;
@@ -56,6 +133,7 @@ type ActivityEvent = {
   entityId?: string;
   entityType?: "idea" | "task";
   statusColor?: string;
+  audioUrl?: string;
 };
 
 function formatTimeAgo(micros: bigint): string {
@@ -94,10 +172,11 @@ function ActivityFeedSkeleton() {
 const eventIcons = {
   message: MessageSquare,
   project_message: MessageSquare,
-  vote_up: ThumbsUp,
-  vote_down: ThumbsDown,
+  vote_up: ArrowUp,
+  vote_down: ArrowDown,
   task: CheckCircle,
   idea: Lightbulb,
+  voice_announcement: MessageSquare,
 };
 
 const eventColors = {
@@ -107,6 +186,7 @@ const eventColors = {
   vote_down: "text-destructive",
   task: "text-accent",
   idea: "text-warning",
+  voice_announcement: "text-primary",
 };
 
 function getIdeaStatusColor(status: string): string {
@@ -123,9 +203,16 @@ function getIdeaStatusColor(status: string): string {
 interface EventRowProps {
   event: ActivityEvent;
   shouldAnimate: boolean;
+  isVoicePlaying: boolean;
+  onToggleVoice: (event: ActivityEvent) => void;
 }
 
-const EventRow = memo(function EventRow({ event, shouldAnimate }: EventRowProps) {
+const EventRow = memo(function EventRow({
+  event,
+  shouldAnimate,
+  isVoicePlaying,
+  onToggleVoice,
+}: EventRowProps) {
   const navigate = useNavigate();
 
   const iconKey =
@@ -157,7 +244,21 @@ const EventRow = memo(function EventRow({ event, shouldAnimate }: EventRowProps)
       )}
     >
       <div className="flex h-full w-6 items-center justify-center">
-        <Icon className={cn("size-4 shrink-0", colorClass)} />
+        {event.type === "voice_announcement" ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleVoice(event);
+            }}
+            className="inline-flex h-6 w-6 cursor-pointer items-center justify-center rounded border border-border bg-surface-elevated transition-colors hover:border-primary/50 hover:bg-surface-overlay"
+            title={isVoicePlaying ? "Pause announcement" : "Play announcement"}
+          >
+            {isVoicePlaying ? <Pause className="size-3.5" /> : <Play className="size-3.5" />}
+          </button>
+        ) : (
+          <Icon className={cn("size-4 shrink-0", colorClass)} />
+        )}
       </div>
       <div className="min-w-0 flex-1">
         <p className="line-clamp-1 text-sm text-foreground/90">{event.title}</p>
@@ -224,10 +325,16 @@ const EventRow = memo(function EventRow({ event, shouldAnimate }: EventRowProps)
               {event.type === "message" && event.channelName && (
                 <span className="text-tiny text-muted-foreground">#{event.channelName}</span>
               )}
-              <AlienAvatar seed={event.actorIdentity!} size={14} />
-              <span className="text-tiny text-muted-foreground">
-                @{event.actor?.toLowerCase().slice(0, 6)}
-              </span>
+              <Link
+                to={`/agents/${event.actor}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-1.5 hover:underline"
+              >
+                <AlienAvatar seed={event.actorIdentity!} size={14} />
+                <span className="text-tiny text-muted-foreground">
+                  @{event.actor?.toLowerCase().slice(0, 6)}
+                </span>
+              </Link>
             </div>
           )}
           {(event.githubIssueUrl || event.githubPrUrl) && (
@@ -283,17 +390,61 @@ export function ActivityFeed({
   const agents = useAgents();
   const projects = useProjects();
   const channels = useChannels();
+  const announcements = useVoiceAnnouncements();
   const containerRef = useRef<HTMLDivElement>(null);
   const prevTopEventIdRef = useRef<string | null>(null);
   const animatedEventIdsRef = useRef<Set<string>>(new Set());
   const didInitialAutofillRef = useRef(false);
-  const [visibleCount, setVisibleCount] = useState(0);
-  const [headOffset, setHeadOffset] = useState(0);
-  const [pendingNewCount, setPendingNewCount] = useState(0);
-  const [isNearTop, setIsNearTop] = useState(true);
-  const [isInitialBatchReady, setIsInitialBatchReady] = useState(false);
+  const [windowState, dispatchWindow] = useReducer(
+    feedWindowReducer,
+    initialFeedWindowState,
+  );
+  const { visibleCount, headOffset, pendingNewCount, isNearTop, isInitialBatchReady } = windowState;
   const [isPending, startTransition] = useTransition();
+  const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const prefersReducedMotion = useReducedMotion();
+
+  const handleToggleVoice = useCallback(
+    (event: ActivityEvent) => {
+      if (event.type !== "voice_announcement" || !event.audioUrl) return;
+
+      if (playingVoiceId === event.id) {
+        audioRef.current?.pause();
+        audioRef.current = null;
+        setPlayingVoiceId(null);
+        return;
+      }
+
+      audioRef.current?.pause();
+      const audio = new Audio(event.audioUrl);
+      audioRef.current = audio;
+      setPlayingVoiceId(event.id);
+
+      audio.onended = () => {
+        setPlayingVoiceId((current) => (current === event.id ? null : current));
+        if (audioRef.current === audio) audioRef.current = null;
+      };
+
+      audio.onerror = () => {
+        setPlayingVoiceId((current) => (current === event.id ? null : current));
+        if (audioRef.current === audio) audioRef.current = null;
+      };
+
+      void audio.play().catch(() => {
+        setPlayingVoiceId((current) => (current === event.id ? null : current));
+        if (audioRef.current === audio) audioRef.current = null;
+      });
+    },
+    [playingVoiceId],
+  );
+
+  useEffect(() => {
+    return () => {
+      audioRef.current?.pause();
+      audioRef.current = null;
+    };
+  }, []);
 
   const agentNames = useMemo(() => {
     const byId = mapAgentsById(agents);
@@ -411,12 +562,27 @@ export function ActivityFeed({
       }),
     );
 
+    const voiceEvents = announcements
+      .filter((a) => AnnouncementStatusEnum.is.ready(a.status) && !!a.audioUrl)
+      .map(
+        (a): ActivityEvent => ({
+          id: `voice-${a.id}`,
+          type: "voice_announcement",
+          timestamp: Number(a.createdAt.microsSinceUnixEpoch),
+          title: a.transcript.slice(0, 100) + (a.transcript.length > 100 ? "..." : ""),
+          subtitle: `Voice #${a.seq.toString()}`,
+          actorName: a.agentName,
+          audioUrl: a.audioUrl,
+        }),
+      );
+
     const allEvents = [
       ...messageEvents,
       ...projectMessageEvents,
       ...voteEvents,
       ...taskEvents,
       ...ideaEvents,
+      ...voiceEvents,
     ];
     allEvents.sort((a, b) => b.timestamp - a.timestamp);
     return allEvents;
@@ -430,12 +596,12 @@ export function ActivityFeed({
     agentAvatarSeeds,
     projectNames,
     channelNames,
+    announcements,
   ]);
 
   useEffect(() => {
     if (allEvents.length === 0) {
-      setVisibleCount(0);
-      setIsInitialBatchReady(false);
+      dispatchWindow({ type: "resetEmpty" });
       didInitialAutofillRef.current = false;
       return;
     }
@@ -448,18 +614,18 @@ export function ActivityFeed({
         Math.max(maxItems, rowsPerViewport * INITIAL_VIEWPORT_MULTIPLIER),
       );
 
-      setVisibleCount(initialCount);
+      dispatchWindow({ type: "setInitialVisibleCount", count: initialCount });
       const rafId = requestAnimationFrame(() => {
-        setIsInitialBatchReady(true);
+        dispatchWindow({ type: "setInitialBatchReady" });
       });
       return () => cancelAnimationFrame(rafId);
     }
 
-    setVisibleCount((prev) => Math.min(prev, allEvents.length));
+    dispatchWindow({ type: "clampVisibleCount", total: allEvents.length });
   }, [allEvents.length, isInitialBatchReady, maxItems]);
 
   useEffect(() => {
-    setHeadOffset((prev) => Math.min(prev, allEvents.length));
+    dispatchWindow({ type: "clampHeadOffset", total: allEvents.length });
   }, [allEvents.length]);
 
   useEffect(() => {
@@ -469,20 +635,12 @@ export function ActivityFeed({
     if (prevTopId && currentTopId && prevTopId !== currentTopId) {
       const prependCount = allEvents.findIndex((event) => event.id === prevTopId);
       if (prependCount > 0 && !isNearTop) {
-        setHeadOffset((prev) => prev + prependCount);
-        setPendingNewCount((prev) => prev + prependCount);
+        dispatchWindow({ type: "prependWhileScrolled", count: prependCount });
       }
     }
 
     prevTopEventIdRef.current = currentTopId;
   }, [allEvents, isNearTop]);
-
-  useEffect(() => {
-    if (isNearTop) {
-      setHeadOffset(0);
-      setPendingNewCount(0);
-    }
-  }, [isNearTop]);
 
   const events = useMemo(() => {
     return allEvents.slice(headOffset, headOffset + visibleCount);
@@ -494,9 +652,12 @@ export function ActivityFeed({
     if (!hasMore || isPending) return;
 
     startTransition(() => {
-      setVisibleCount((prev) => Math.min(prev + maxItems, allEvents.length));
+      dispatchWindow({
+        type: "loadMore",
+        count: Math.min(visibleCount + maxItems, allEvents.length),
+      });
     });
-  }, [allEvents.length, hasMore, isPending, maxItems, startTransition]);
+  }, [allEvents.length, hasMore, isPending, maxItems, startTransition, visibleCount]);
 
   const handleScroll = useCallback(() => {
     const el = containerRef.current;
@@ -504,7 +665,7 @@ export function ActivityFeed({
 
     const nearTop = el.scrollTop <= TOP_STICKY_THRESHOLD;
     if (nearTop !== isNearTop) {
-      setIsNearTop(nearTop);
+      dispatchWindow({ type: "setNearTop", value: nearTop });
     }
 
     if (!hasMore || isPending) return;
@@ -516,9 +677,7 @@ export function ActivityFeed({
   }, [hasMore, isPending, isNearTop, loadMore]);
 
   const handleJumpToLatest = useCallback(() => {
-    setHeadOffset(0);
-    setPendingNewCount(0);
-    setIsNearTop(true);
+    dispatchWindow({ type: "jumpToLatest" });
     const el = containerRef.current;
     if (el) {
       el.scrollTop = 0;
@@ -612,7 +771,12 @@ export function ActivityFeed({
                       transform: `translateY(${virtualItem.start}px)`,
                     }}
                   >
-                    <EventRow event={event} shouldAnimate={shouldAnimate} />
+                    <EventRow
+                      event={event}
+                      shouldAnimate={shouldAnimate}
+                      isVoicePlaying={playingVoiceId === event.id}
+                      onToggleVoice={handleToggleVoice}
+                    />
                   </div>
                 );
               })}

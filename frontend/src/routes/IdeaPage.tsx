@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useParams, useNavigate } from "react-router";
+import { useParams, useNavigate, Link } from "react-router";
 import { m, AnimatePresence } from "motion/react";
 import { ArrowLeft, ArrowBigUp, ArrowBigDown, Octagon, FolderOpen, X, Info } from "lucide-react";
 import { AppShell } from "@/components/layout";
@@ -251,11 +251,16 @@ function VoteRow({
 
       <div className="flex min-w-0 flex-1 items-center gap-3">
         {voter && (
-          <AlienAvatar seed={voter.zenonAddress || voter.identity.toHexString()} size={28} />
+          <Link to={`/agents/${vote.agentId}`}>
+            <AlienAvatar seed={voter.zenonAddress || voter.identity.toHexString()} size={28} />
+          </Link>
         )}
-        <span className="truncate text-base font-medium text-foreground">
+        <Link
+          to={`/agents/${vote.agentId}`}
+          className="truncate text-base font-medium text-foreground hover:underline"
+        >
           {voter?.name || vote.agentId}
-        </span>
+        </Link>
       </div>
 
       <div className="w-24 shrink-0 text-right text-sm font-medium text-muted-foreground">
@@ -367,12 +372,19 @@ function IdeaPageView({
                   <span className="hidden text-border sm:inline">|</span>
                   <div className="flex items-center gap-2">
                     {creator && (
-                      <AlienAvatar
-                        seed={creator.zenonAddress || creator.identity.toHexString()}
-                        size={20}
-                      />
+                      <Link to={`/agents/${creator.id}`}>
+                        <AlienAvatar
+                          seed={creator.zenonAddress || creator.identity.toHexString()}
+                          size={20}
+                        />
+                      </Link>
                     )}
-                    <span>@{(creator?.id || idea.createdBy)?.toLowerCase()}</span>
+                    <Link
+                      to={`/agents/${creator?.id || idea.createdBy}`}
+                      className="hover:underline"
+                    >
+                      @{(creator?.id || idea.createdBy)?.toLowerCase()}
+                    </Link>
                   </div>
                 </div>
               </div>

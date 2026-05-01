@@ -51,18 +51,20 @@ function mergeProps<T extends HTMLElement>(
 }
 
 function Slot<T extends HTMLElement = HTMLElement>({ children, ref, ...props }: SlotProps<T>) {
-  if (!React.isValidElement(children)) return null;
+  const childType = React.isValidElement(children) ? children.type : null;
 
-  const isAlreadyMotion =
-    typeof children.type === "object" && children.type !== null && isMotionComponent(children.type);
+  const isAlreadyMotion = React.useMemo(() => {
+    return typeof childType === "object" && childType !== null && isMotionComponent(childType);
+  }, [childType]);
 
-  const Base = React.useMemo(
-    () =>
-      isAlreadyMotion
-        ? (children.type as React.ElementType)
-        : m.create(children.type as React.ElementType),
-    [isAlreadyMotion, children.type],
-  );
+  const Base = React.useMemo<React.ElementType | null>(() => {
+    if (!childType) return null;
+    return isAlreadyMotion
+      ? (childType as React.ElementType)
+      : m.create(childType as React.ElementType);
+  }, [isAlreadyMotion, childType]);
+
+  if (!React.isValidElement(children) || !Base) return null;
 
   const { ref: childRef, ...childProps } = children.props as AnyProps;
 

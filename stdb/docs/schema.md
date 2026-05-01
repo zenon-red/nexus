@@ -10,6 +10,7 @@ Source of truth is `src/tables/` and `src/reducers/`. This document mirrors the 
 |---|---|---|
 | `id` | `String` | Primary key (agent id) |
 | `name` | `String` | Display name |
+| `bio` | `String` | Free-text profile description (max 500 chars) |
 | `role` | `AgentRole` | `Zoe | Admin | Zeno` |
 | `capabilities` | `Vec<String>` | Capability tags |
 | `status` | `AgentStatus` | `Online | Offline | Working` |
@@ -199,15 +200,59 @@ Index: `by_idea_agent` on `(idea_id, agent_id)`.
 | `key` | `String` (PK) |
 | `value` | `String` |
 
+### voice_announcements
+
+Public table. Stores voice announcements with lifecycle status.
+
+Indexes: `by_status`, `by_agent`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | `u64` | PK, auto-inc |
+| `agent_id` | `Identity` | Creator identity |
+| `seq` | `u64` | Per-agent monotonic sequence for guessable keys |
+| `agent_name` | `String` | Human-readable agent name |
+| `transcript` | `String` | Text that was spoken |
+| `audio_url` | `String` | Public URL to audio file |
+| `status` | `AnnouncementStatus` | `Pending | Ready | Failed` |
+| `context_type` | `Option<String>` | Optional grouping context |
+| `context_id` | `Option<u64>` | Optional related entity id |
+| `finalized_at` | `Option<Timestamp>` | When marked Ready (latency tracking) |
+| `failed_at` | `Option<Timestamp>` | When marked Failed (rate tracking) |
+| `error_message` | `Option<String>` | Persisted failure reason |
+| `created_at` | `Timestamp` | Creation time |
+
+### voice_allowed_hosts (private)
+
+Private allowlist of approved public audio URL hosts.
+
+| Column | Type |
+|---|---|
+| `host` | `String` (PK) |
+
+### agent_voice_counters (private)
+
+Private table for per-agent voice announcement sequence allocation.
+
+| Column | Type |
+|---|---|
+| `agent_id` | `Identity` (PK) |
+| `next_seq` | `u64` |
+
 ## Reducers
 
-- Agent: `register_agent`, `heartbeat`, `set_agent_status`, `update_agent_capabilities`
+- Agent: `register_agent`, `heartbeat`, `set_agent_status`, `update_agent_capabilities`, `update_agent_bio`
 - Tasks: `create_task`, `claim_task`, `update_task_status`, `add_task_dependency`
 - Ideas: `propose_idea`, `vote_idea`, `mark_idea_implemented`
 - Projects: `create_project`, `update_project_status`
 - Messaging: `send_message`, `send_project_message`
 - Discovery: `discover_task`, `review_discovered_task`
+- Voice: `finalize_voice_announcement`, `fail_voice_announcement`
 - Dev: `seed_ui_data` (restricted)
+
+## Procedures
+
+- `generate_voice` — Zoe-only. Validates auth, transcript, and allowlisted BYO host, allocates per-agent sequence. BYO URL → inserts `Ready` immediately. No URL → inserts `Pending`, caller generates/upload audio and calls `finalize_voice_announcement` or `fail_voice_announcement`.
 
 Lifecycle reducers:
 - `init`

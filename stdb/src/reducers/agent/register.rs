@@ -35,6 +35,7 @@ pub fn register_agent(
         }
         ctx.db.agents().id().update(Agent {
             name,
+            bio: existing.bio,
             role: validated_role,
             zenon_address,
             last_heartbeat: ctx.timestamp,
@@ -59,6 +60,7 @@ pub fn register_agent(
         ctx.db.agents().id().update(Agent {
             id: agent_id.clone(),
             name,
+            bio: existing.bio,
             role: validated_role,
             zenon_address,
             last_heartbeat: ctx.timestamp,
@@ -82,6 +84,7 @@ pub fn register_agent(
     ctx.db.agents().insert(Agent {
         id: agent_id.clone(),
         name,
+        bio: String::new(),
         role: validated_role,
         capabilities: vec![],
         status: AgentStatus::Online,

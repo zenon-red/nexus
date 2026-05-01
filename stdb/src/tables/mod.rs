@@ -1,4 +1,5 @@
 pub mod agent;
+pub mod agent_voice_counter;
 pub mod channel;
 pub mod config;
 pub mod discovered_task;
@@ -12,8 +13,11 @@ pub mod project_message;
 pub mod task;
 pub mod task_dependency;
 pub mod vote;
+pub mod voice_announcement;
+pub mod voice_allowed_host;
 
 pub use agent::Agent;
+pub use agent_voice_counter::AgentVoiceCounter;
 pub use channel::Channel;
 pub use config::Config;
 pub use discovered_task::DiscoveredTask;
@@ -27,3 +31,5 @@ pub use project_message::ProjectMessage;
 pub use task::Task;
 pub use task_dependency::TaskDependency;
 pub use vote::Vote;
+pub use voice_announcement::VoiceAnnouncement;
+pub use voice_allowed_host::VoiceAllowedHost;
