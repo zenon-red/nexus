@@ -314,7 +314,7 @@ function MessageRow({ msg, index, isZoe }: MessageRowProps) {
               {formatClockTime(msg.createdAt)}
             </span>
           </div>
-          <p className="text-sm leading-relaxed text-foreground/80">{msg.content}</p>
+          <p className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/80">{msg.content}</p>
         </div>
       </div>
     </m.div>
@@ -406,7 +406,7 @@ export function ProjectPage() {
   }, [liveProject.assignees]);
 
   const sortedTasks = useMemo(() => {
-    return [...liveProject.tasks].sort(
+    return liveProject.tasks.toSorted(
       (a, b) => Number(b.updatedAt.microsSinceUnixEpoch) - Number(a.updatedAt.microsSinceUnixEpoch),
     );
   }, [liveProject.tasks]);
@@ -669,7 +669,7 @@ export function ProjectPage() {
                       >
                         ×
                       </button>
-                      <p className="mb-4 text-[15px] leading-7 text-slate-300">
+                      <p className="mb-4 text-[15px] leading-7 whitespace-pre-wrap text-slate-300">
                         {latestProjectDirective.content}
                       </p>
                       <div className="flex items-center justify-between font-mono text-xs text-slate-500">

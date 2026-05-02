@@ -15,6 +15,7 @@ interface CellPosition {
 }
 
 interface MatrixProps extends React.HTMLAttributes<HTMLDivElement> {
+  ref?: React.Ref<HTMLDivElement>;
   rows: number;
   cols: number;
   pattern?: Frame;
@@ -453,132 +454,129 @@ export const snake: Frame[] = (() => {
   return frames;
 })();
 
-export const Matrix = React.forwardRef<HTMLDivElement, MatrixProps>(
-  (
-    {
-      rows,
-      cols,
-      pattern,
-      frames,
-      fps = 12,
-      autoplay = true,
-      loop = true,
-      size = 10,
-      gap = 2,
-      palette = {
-        on: "currentColor",
-        off: "var(--muted-foreground)",
-      },
-      brightness = 1,
-      ariaLabel,
-      onFrame,
-      mode = "default",
-      levels,
-      enableGlow = true,
-      pixelTransition = true,
-      activeScale = 1.1,
-      className,
-      ...props
-    },
-    ref,
-  ) => {
-    const localRef = useRef<HTMLDivElement>(null);
-    React.useImperativeHandle(ref, () => localRef.current as HTMLDivElement);
-    const isInView = useInView(localRef, { once: false, margin: "-50px" });
+export function Matrix({
+  ref,
+  rows,
+  cols,
+  pattern,
+  frames,
+  fps = 12,
+  autoplay = true,
+  loop = true,
+  size = 10,
+  gap = 2,
+  palette = {
+    on: "currentColor",
+    off: "var(--muted-foreground)",
+  },
+  brightness = 1,
+  ariaLabel,
+  onFrame,
+  mode = "default",
+  levels,
+  enableGlow = true,
+  pixelTransition = true,
+  activeScale = 1.1,
+  className,
+  ...props
+}: MatrixProps) {
+  const localRef = useRef<HTMLDivElement>(null);
+  React.useImperativeHandle(ref, () => localRef.current as HTMLDivElement);
+  const isInView = useInView(localRef, { once: false, margin: "-50px" });
 
-    const { frameIndex } = useAnimation(frames, {
-      fps,
-      autoplay: autoplay && !pattern && isInView,
-      loop,
-      onFrame,
-    });
+  const { frameIndex } = useAnimation(frames, {
+    fps,
+    autoplay: autoplay && !pattern && isInView,
+    loop,
+    onFrame,
+  });
 
-    const currentFrame = useMemo(() => {
-      if (mode === "vu" && levels && levels.length > 0) {
-        return ensureFrameSize(vu(cols, levels), rows, cols);
+  const currentFrame = useMemo(() => {
+    if (mode === "vu" && levels && levels.length > 0) {
+      return ensureFrameSize(vu(cols, levels), rows, cols);
+    }
+
+    if (pattern) {
+      return ensureFrameSize(pattern, rows, cols);
+    }
+
+    if (frames && frames.length > 0) {
+      return ensureFrameSize(frames[frameIndex] || frames[0], rows, cols);
+    }
+
+    return ensureFrameSize([], rows, cols);
+  }, [pattern, frames, frameIndex, rows, cols, mode, levels]);
+
+  const cellPositions = useMemo(() => {
+    const positions: CellPosition[][] = [];
+
+    for (let row = 0; row < rows; row++) {
+      positions[row] = [];
+      for (let col = 0; col < cols; col++) {
+        positions[row][col] = {
+          x: col * (size + gap),
+          y: row * (size + gap),
+        };
       }
+    }
 
-      if (pattern) {
-        return ensureFrameSize(pattern, rows, cols);
+    return positions;
+  }, [rows, cols, size, gap]);
+
+  const svgDimensions = useMemo(() => {
+    return {
+      width: cols * (size + gap) - gap,
+      height: rows * (size + gap) - gap,
+    };
+  }, [rows, cols, size, gap]);
+
+  const isAnimating = !pattern && frames && frames.length > 0;
+
+  return (
+    <div
+      ref={localRef}
+      role="img"
+      aria-label={ariaLabel ?? "matrix display"}
+      aria-live={isAnimating ? "polite" : undefined}
+      className={cn("relative inline-block", className)}
+      style={
+        {
+          "--matrix-on": palette.on,
+          "--matrix-off": palette.off,
+          "--matrix-gap": `${gap}px`,
+          "--matrix-size": `${size}px`,
+        } as React.CSSProperties
       }
-
-      if (frames && frames.length > 0) {
-        return ensureFrameSize(frames[frameIndex] || frames[0], rows, cols);
-      }
-
-      return ensureFrameSize([], rows, cols);
-    }, [pattern, frames, frameIndex, rows, cols, mode, levels]);
-
-    const cellPositions = useMemo(() => {
-      const positions: CellPosition[][] = [];
-
-      for (let row = 0; row < rows; row++) {
-        positions[row] = [];
-        for (let col = 0; col < cols; col++) {
-          positions[row][col] = {
-            x: col * (size + gap),
-            y: row * (size + gap),
-          };
-        }
-      }
-
-      return positions;
-    }, [rows, cols, size, gap]);
-
-    const svgDimensions = useMemo(() => {
-      return {
-        width: cols * (size + gap) - gap,
-        height: rows * (size + gap) - gap,
-      };
-    }, [rows, cols, size, gap]);
-
-    const isAnimating = !pattern && frames && frames.length > 0;
-
-    return (
-      <div
-        ref={localRef}
-        role="img"
-        aria-label={ariaLabel ?? "matrix display"}
-        aria-live={isAnimating ? "polite" : undefined}
-        className={cn("relative inline-block", className)}
-        style={
-          {
-            "--matrix-on": palette.on,
-            "--matrix-off": palette.off,
-            "--matrix-gap": `${gap}px`,
-            "--matrix-size": `${size}px`,
-          } as React.CSSProperties
-        }
-        {...props}
+      {...props}
+    >
+      <svg
+        width={svgDimensions.width}
+        height={svgDimensions.height}
+        viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
+        xmlns="http://www.w3.org/2000/svg"
+        className="block"
+        style={{ overflow: "visible" }}
       >
-        <svg
-          width={svgDimensions.width}
-          height={svgDimensions.height}
-          viewBox={`0 0 ${svgDimensions.width} ${svgDimensions.height}`}
-          xmlns="http://www.w3.org/2000/svg"
-          className="block"
-          style={{ overflow: "visible" }}
-        >
-          <defs>
-            <radialGradient id="matrix-pixel-on" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="var(--matrix-on)" stopOpacity="1" />
-              <stop offset="70%" stopColor="var(--matrix-on)" stopOpacity="0.85" />
-              <stop offset="100%" stopColor="var(--matrix-on)" stopOpacity="0.6" />
-            </radialGradient>
+        <defs>
+          <radialGradient id="matrix-pixel-on" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="var(--matrix-on)" stopOpacity="1" />
+            <stop offset="70%" stopColor="var(--matrix-on)" stopOpacity="0.85" />
+            <stop offset="100%" stopColor="var(--matrix-on)" stopOpacity="0.6" />
+          </radialGradient>
 
-            <radialGradient id="matrix-pixel-off" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="var(--matrix-off)" stopOpacity="1" />
-              <stop offset="100%" stopColor="var(--matrix-off)" stopOpacity="0.7" />
-            </radialGradient>
+          <radialGradient id="matrix-pixel-off" cx="50%" cy="50%" r="50%">
+            <stop offset="0%" stopColor="var(--matrix-off)" stopOpacity="1" />
+            <stop offset="100%" stopColor="var(--matrix-off)" stopOpacity="0.7" />
+          </radialGradient>
 
-            <filter id="matrix-glow" x="-100%" y="-100%" width="300%" height="300%">
-              <feGaussianBlur stdDeviation={Math.max(2, size * 0.25)} result="blur" />
-              <feComposite in="SourceGraphic" in2="blur" operator="over" />
-            </filter>
-          </defs>
+          <filter id="matrix-glow" x="-100%" y="-100%" width="300%" height="300%">
+            <feGaussianBlur stdDeviation={Math.max(2, size * 0.25)} result="blur" />
+            <feComposite in="SourceGraphic" in2="blur" operator="over" />
+          </filter>
+        </defs>
 
-          <style>
-            {`
+        <style>
+          {`
               .matrix-pixel {
                 transition: ${pixelTransition ? "opacity 220ms ease-out, transform 120ms ease-out" : "none"};
                 transform-origin: center;
@@ -588,45 +586,42 @@ export const Matrix = React.forwardRef<HTMLDivElement, MatrixProps>(
                 filter: url(#matrix-glow);
               }
             `}
-          </style>
+        </style>
 
-          {currentFrame.map((row, rowIndex) =>
-            row.map((value, colIndex) => {
-              const pos = cellPositions[rowIndex]?.[colIndex];
-              if (!pos) return null;
+        {currentFrame.map((row, rowIndex) =>
+          row.map((value, colIndex) => {
+            const pos = cellPositions[rowIndex]?.[colIndex];
+            if (!pos) return null;
 
-              const opacity = clamp(brightness * value);
-              const isActive = opacity > 0.5;
-              const isOn = opacity > 0.05;
-              const fill = isOn ? "url(#matrix-pixel-on)" : "url(#matrix-pixel-off)";
+            const opacity = clamp(brightness * value);
+            const isActive = opacity > 0.5;
+            const isOn = opacity > 0.05;
+            const fill = isOn ? "url(#matrix-pixel-on)" : "url(#matrix-pixel-off)";
 
-              const scale = isActive ? activeScale : 1;
-              const radius = (size / 2) * 0.9;
+            const scale = isActive ? activeScale : 1;
+            const radius = (size / 2) * 0.9;
 
-              return (
-                <circle
-                  key={`${rowIndex}-${colIndex}`}
-                  className={cn(
-                    "matrix-pixel",
-                    isActive && enableGlow && "matrix-pixel-active",
-                    !isOn && "opacity-20 dark:opacity-[0.1]",
-                  )}
-                  cx={pos.x + size / 2}
-                  cy={pos.y + size / 2}
-                  r={radius}
-                  fill={fill}
-                  opacity={isOn ? opacity : 0.1}
-                  style={{
-                    transform: `scale(${scale})`,
-                  }}
-                />
-              );
-            }),
-          )}
-        </svg>
-      </div>
-    );
-  },
-);
-
-Matrix.displayName = "Matrix";
+            return (
+              <circle
+                key={`${rowIndex}-${colIndex}`}
+                className={cn(
+                  "matrix-pixel",
+                  isActive && enableGlow && "matrix-pixel-active",
+                  !isOn && "opacity-20 dark:opacity-[0.1]",
+                )}
+                cx={pos.x + size / 2}
+                cy={pos.y + size / 2}
+                r={radius}
+                fill={fill}
+                opacity={isOn ? opacity : 0.1}
+                style={{
+                  transform: `scale(${scale})`,
+                }}
+              />
+            );
+          }),
+        )}
+      </svg>
+    </div>
+  );
+}

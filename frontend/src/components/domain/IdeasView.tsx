@@ -332,7 +332,7 @@ export function IdeasView({
         filtered = ideas.filter((i) => IdeaStatusEnum.is.rejected(i.status));
       }
     }
-    return [...filtered].sort((a, b) => b.computedScore - a.computedScore).slice(0, maxItems);
+    return filtered.toSorted((a, b) => b.computedScore - a.computedScore).slice(0, maxItems);
   }, [ideas, maxItems, filter]);
 
   const title =

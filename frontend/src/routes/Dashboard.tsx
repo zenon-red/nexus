@@ -127,7 +127,7 @@ export function Dashboard() {
                   <button
                     type="button"
                     onClick={() => voiceState.enableVoice()}
-                    className="absolute bottom-3 left-3 z-20 inline-flex items-center gap-1.5 rounded-md border border-border bg-black px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-black/80"
+                    className="absolute bottom-3 left-3 z-20 inline-flex items-center gap-1.5 rounded-md border border-border bg-slate-950 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-slate-950/80"
                   >
                     <Play className="size-3.5" />
                     Enable Voice
@@ -137,7 +137,7 @@ export function Dashboard() {
                   <button
                     type="button"
                     onClick={() => voiceState.pauseVoice()}
-                    className="absolute bottom-3 left-3 z-20 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-black text-foreground transition-colors hover:bg-black/80"
+                    className="absolute bottom-3 left-3 z-20 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-slate-950 text-foreground transition-colors hover:bg-slate-950/80"
                     aria-label="Pause voice"
                   >
                     <Pause className="size-3.5" />

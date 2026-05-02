@@ -63,7 +63,7 @@ export function AgentProfileHeader({
           </div>
 
           {agent.bio ? (
-            <p className="max-w-prose text-sm leading-relaxed text-foreground/85 sm:text-base">
+            <p className="max-w-prose text-sm leading-relaxed whitespace-pre-wrap text-foreground/85 sm:text-base">
               {agent.bio}
             </p>
           ) : (

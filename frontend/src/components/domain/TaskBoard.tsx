@@ -348,8 +348,8 @@ export function TaskBoard({ className, maxItems = 50, showInnerTexture = false }
       Blocked: 5,
     };
 
-    const sliced = [...tasks]
-      .sort(
+    const sliced = tasks
+      .toSorted(
         (a, b) =>
           Number(b.updatedAt.microsSinceUnixEpoch) - Number(a.updatedAt.microsSinceUnixEpoch),
       )
