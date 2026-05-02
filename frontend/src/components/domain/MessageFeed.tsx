@@ -389,7 +389,7 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
                   >
                     ×
                   </button>
-                  <p className="mb-4 text-[15px] leading-7 text-slate-300">
+                  <p className="mb-4 text-[15px] leading-7 whitespace-pre-wrap text-slate-300">
                     {latestChannelDirective.content}
                   </p>
                   <div className="flex items-center justify-between font-mono text-xs text-slate-500">

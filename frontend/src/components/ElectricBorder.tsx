@@ -232,8 +232,7 @@ const ElectricBorder: React.FC<ElectricBorderProps> = ({
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       canvas.width = width * dpr;
       canvas.height = height * dpr;
-      canvas.style.width = `${width}px`;
-      canvas.style.height = `${height}px`;
+      canvas.style.cssText = `width: ${width}px; height: ${height}px;`;
       ctx.scale(dpr, dpr);
 
       return { width, height };
@@ -355,7 +354,7 @@ const ElectricBorder: React.FC<ElectricBorderProps> = ({
         <div
           className="pointer-events-none absolute inset-0 -z-[1] scale-110 rounded-[inherit] opacity-30"
           style={{
-            filter: "blur(32px)",
+            filter: "blur(8px)",
             background: `linear-gradient(-30deg, ${color}, transparent, ${color})`,
           }}
         />

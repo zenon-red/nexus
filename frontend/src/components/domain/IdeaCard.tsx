@@ -65,7 +65,7 @@ interface IdeasGridProps {
 }
 
 export function IdeasGrid({ ideas, className }: IdeasGridProps) {
-  const sortedIdeas = [...ideas].sort(
+  const sortedIdeas = ideas.toSorted(
     (a, b) => Number(b.createdAt.microsSinceUnixEpoch) - Number(a.createdAt.microsSinceUnixEpoch),
   );
 

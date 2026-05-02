@@ -111,12 +111,12 @@ function computeWeightedScore(
 ): number {
   if (scores.length === 0) return 0;
 
+  const scoresByDimension = new Map(scores.map((score) => [score.dimension, score.score]));
   let totalWeight = 0;
   let weightedSum = 0;
 
   for (const [name, dim] of dimensionWeights) {
-    const score = scores.find((s) => s.dimension === name);
-    const rawScore = score ? score.score : (dim.minScore + dim.maxScore) / 2;
+    const rawScore = scoresByDimension.get(name) ?? (dim.minScore + dim.maxScore) / 2;
     const clamped = Math.max(dim.minScore, Math.min(dim.maxScore, rawScore));
     const range = dim.maxScore - dim.minScore;
     const normalized = range > 0 ? (clamped - dim.minScore) / range : 0;
@@ -741,7 +741,7 @@ export function IdeaPage() {
   }, [dimensions]);
 
   const sortedVotes = useMemo(() => {
-    return [...votes].sort(
+    return votes.toSorted(
       (a, b) => Number(b.createdAt.microsSinceUnixEpoch) - Number(a.createdAt.microsSinceUnixEpoch),
     );
   }, [votes]);

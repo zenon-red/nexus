@@ -75,10 +75,7 @@ const initialFeedWindowState: FeedWindowState = {
   isInitialBatchReady: false,
 };
 
-function feedWindowReducer(
-  state: FeedWindowState,
-  action: FeedWindowAction,
-): FeedWindowState {
+function feedWindowReducer(state: FeedWindowState, action: FeedWindowAction): FeedWindowState {
   switch (action.type) {
     case "resetEmpty":
       return {
@@ -224,7 +221,7 @@ const EventRow = memo(function EventRow({
   const Icon = eventIcons[iconKey] || MessageSquare;
   const colorClass = eventColors[iconKey] || eventColors.message;
 
-  const handleClick = () => {
+  const navigateToEventLink = () => {
     if (event.linkPath) {
       navigate(event.linkPath);
     }
@@ -237,7 +234,7 @@ const EventRow = memo(function EventRow({
       initial={shouldAnimate ? { opacity: 0, y: 8 } : false}
       animate={{ opacity: 1, y: 0 }}
       transition={shouldAnimate ? { duration: 0.16, ease: "easeOut" } : { duration: 0 }}
-      onClick={handleClick}
+      onClick={navigateToEventLink}
       className={cn(
         "flex items-center gap-3 border-b border-border/10 px-4 py-3 transition-colors hover:border-border/20 hover:bg-white/2",
         event.linkPath && "cursor-pointer",
@@ -395,10 +392,7 @@ export function ActivityFeed({
   const prevTopEventIdRef = useRef<string | null>(null);
   const animatedEventIdsRef = useRef<Set<string>>(new Set());
   const didInitialAutofillRef = useRef(false);
-  const [windowState, dispatchWindow] = useReducer(
-    feedWindowReducer,
-    initialFeedWindowState,
-  );
+  const [windowState, dispatchWindow] = useReducer(feedWindowReducer, initialFeedWindowState);
   const { visibleCount, headOffset, pendingNewCount, isNearTop, isInitialBatchReady } = windowState;
   const [isPending, startTransition] = useTransition();
   const [playingVoiceId, setPlayingVoiceId] = useState<string | null>(null);
@@ -562,19 +556,24 @@ export function ActivityFeed({
       }),
     );
 
-    const voiceEvents = announcements
-      .filter((a) => AnnouncementStatusEnum.is.ready(a.status) && !!a.audioUrl)
-      .map(
-        (a): ActivityEvent => ({
-          id: `voice-${a.id}`,
-          type: "voice_announcement",
-          timestamp: Number(a.createdAt.microsSinceUnixEpoch),
-          title: a.transcript.slice(0, 100) + (a.transcript.length > 100 ? "..." : ""),
-          subtitle: `Voice #${a.seq.toString()}`,
-          actorName: a.agentName,
-          audioUrl: a.audioUrl,
-        }),
-      );
+    const voiceEvents: ActivityEvent[] = [];
+    for (const announcement of announcements) {
+      if (!AnnouncementStatusEnum.is.ready(announcement.status) || !announcement.audioUrl) {
+        continue;
+      }
+
+      voiceEvents.push({
+        id: `voice-${announcement.id}`,
+        type: "voice_announcement",
+        timestamp: Number(announcement.createdAt.microsSinceUnixEpoch),
+        title:
+          announcement.transcript.slice(0, 100) +
+          (announcement.transcript.length > 100 ? "..." : ""),
+        subtitle: `Voice #${announcement.seq.toString()}`,
+        actorName: announcement.agentName,
+        audioUrl: announcement.audioUrl,
+      });
+    }
 
     const allEvents = [
       ...messageEvents,

@@ -227,11 +227,7 @@ function PoweredByNexus() {
   if (!isExpanded) {
     return (
       <div className="flex justify-center py-2">
-        <a
-          href="https://github.com/zenon-red/nexus"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
+        <a href="https://github.com/zenon-red/nexus" target="_blank" rel="noopener noreferrer">
           <img
             src="/assets/nexus-icon.webp"
             alt="Nexus"

@@ -158,7 +158,7 @@ function ActivityFeedRow({ item }: { item: ActivityItem }) {
   const Icon = eventIcons[iconKey];
   const colorClass = eventColors[iconKey];
 
-  const handleClick = () => {
+  const navigateToActivityItem = () => {
     if (item.kind === "task") navigate(`/projects/${item.data.projectId.toString()}`);
     else if (item.kind === "idea") navigate(`/ideas/${item.data.id.toString()}`);
     else if (item.kind === "vote") navigate(`/ideas/${item.data.ideaId.toString()}`);
@@ -168,7 +168,7 @@ function ActivityFeedRow({ item }: { item: ActivityItem }) {
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     if (!hasLink || (event.key !== "Enter" && event.key !== " ")) return;
     event.preventDefault();
-    handleClick();
+    navigateToActivityItem();
   };
 
   let title = "";
@@ -279,7 +279,7 @@ function ActivityFeedRow({ item }: { item: ActivityItem }) {
   if (hasLink) {
     return (
       <div
-        onClick={handleClick}
+        onClick={navigateToActivityItem}
         onKeyDown={handleKeyDown}
         role="button"
         tabIndex={0}

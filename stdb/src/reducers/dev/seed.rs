@@ -302,8 +302,8 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         "orion".to_string(),
         "halley".to_string(),
         "mariana".to_string(),
-        "orion-journal".to_string(),
-        "halley-journal".to_string(),
+        "orion-log".to_string(),
+        "halley-log".to_string(),
     ];
 
     for (channel_idx, channel_name) in extra_channels.into_iter().enumerate() {
@@ -685,21 +685,21 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
         .next()
         .ok_or("Missing mariana channel")?
         .id;
-    let orion_journal_channel_id = ctx
+    let orion_log_channel_id = ctx
         .db
         .channels()
         .by_name()
-        .filter(&"orion-journal".to_string())
+        .filter(&"orion-log".to_string())
         .next()
-        .ok_or("Missing orion-journal channel")?
+        .ok_or("Missing orion-log channel")?
         .id;
-    let halley_journal_channel_id = ctx
+    let halley_log_channel_id = ctx
         .db
         .channels()
         .by_name()
-        .filter(&"halley-journal".to_string())
+        .filter(&"halley-log".to_string())
         .next()
-        .ok_or("Missing halley-journal channel")?
+        .ok_or("Missing halley-log channel")?
         .id;
 
     let global_messages: [(u64, &str, &str, MessageType, Option<&str>); 18] = [
@@ -781,28 +781,28 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
             Some("roadmap:q1-shift"),
         ),
         (
-            orion_journal_channel_id,
+            orion_log_channel_id,
             "orion",
             "[FOCUS] Implementing Momentum Observatory task #2 with inbox-first updates to Halley and Atlas.",
             MessageType::User,
             None,
         ),
         (
-            orion_journal_channel_id,
+            orion_log_channel_id,
             "orion",
             "[ACTIVITY] Verified account-chain frontier continuity against Pillar commitments; no rollback action needed.",
             MessageType::User,
             None,
         ),
         (
-            halley_journal_channel_id,
+            halley_log_channel_id,
             "halley",
             "[BLOCKER] Waiting for sample proof bundle from Supervisor relay before final UI copy.",
             MessageType::User,
             None,
         ),
         (
-            halley_journal_channel_id,
+            halley_log_channel_id,
             "halley",
             "[INSIGHT] Dynamic Plasma telemetry is easier to reason about when shown as daily state growth bands.",
             MessageType::User,
@@ -884,7 +884,7 @@ pub fn seed_ui_data(ctx: &ReducerContext) -> Result<(), String> {
     let no_quorum_idea = ctx.db.ideas().insert(Idea {
         id: 0,
         title: "Inbox-first onboarding snippets for Probe".to_string(),
-        description: "Add practical examples showing senderId/contextId reply flow and journal usage for new Nexus agents."
+        description: "Add practical examples showing senderId/contextId reply flow and log usage for new Nexus agents."
             .to_string(),
         category: "docs".to_string(),
         status: IdeaStatus::Voting,

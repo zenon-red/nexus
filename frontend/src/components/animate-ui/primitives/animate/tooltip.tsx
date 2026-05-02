@@ -123,6 +123,7 @@ function TooltipProvider({
     setCurrentTooltip(null);
     lastCloseTimeRef.current = Date.now();
   }, []);
+  const hideImmediateFromEffect = React.useEffectEvent(hideImmediate);
 
   const setReferenceEl = React.useCallback((el: HTMLElement | null) => {
     referenceElRef.current = el;
@@ -130,17 +131,17 @@ function TooltipProvider({
 
   React.useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") hideImmediate();
+      if (e.key === "Escape") hideImmediateFromEffect();
     };
     window.addEventListener("keydown", onKeyDown, true);
-    window.addEventListener("scroll", hideImmediate, true);
-    window.addEventListener("resize", hideImmediate, true);
+    window.addEventListener("scroll", hideImmediateFromEffect, true);
+    window.addEventListener("resize", hideImmediateFromEffect, true);
     return () => {
       window.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("scroll", hideImmediate, true);
-      window.removeEventListener("resize", hideImmediate, true);
+      window.removeEventListener("scroll", hideImmediateFromEffect, true);
+      window.removeEventListener("resize", hideImmediateFromEffect, true);
     };
-  }, [hideImmediate]);
+  }, []);
 
   return (
     <GlobalTooltipProvider
@@ -217,23 +218,18 @@ function TooltipPortal(props: TooltipPortalProps) {
 function TooltipOverlay() {
   const { currentTooltip, transition, referenceElRef } = useGlobalTooltip();
 
-  const [rendered, setRendered] = React.useState<{
-    data: TooltipData | null;
-    open: boolean;
-  }>({ data: null, open: false });
-
   const arrowRef = React.useRef<SVGSVGElement | null>(null);
 
-  const side = rendered.data?.side ?? "top";
-  const align = rendered.data?.align ?? "center";
+  const side = currentTooltip?.side ?? "top";
+  const align = currentTooltip?.align ?? "center";
 
   const { refs, x, y, strategy, context, update } = useFloating({
     placement: align === "center" ? side : `${side}-${align}`,
     whileElementsMounted: autoUpdate,
     middleware: [
       floatingOffset({
-        mainAxis: rendered.data?.sideOffset ?? 0,
-        crossAxis: rendered.data?.alignOffset ?? 0,
+        mainAxis: currentTooltip?.sideOffset ?? 0,
+        crossAxis: currentTooltip?.alignOffset ?? 0,
       }),
       flip(),
       shift({ padding: 8 }),
@@ -241,35 +237,27 @@ function TooltipOverlay() {
     ],
   });
 
-  React.useEffect(() => {
-    if (currentTooltip) {
-      setRendered({ data: currentTooltip, open: true });
-    } else {
-      setRendered((p) => (p.data ? { ...p, open: false } : p));
-    }
-  }, [currentTooltip]);
-
   React.useLayoutEffect(() => {
     if (referenceElRef.current) {
       refs.setReference(referenceElRef.current);
       update();
     }
-  }, [referenceElRef, refs, update, rendered.data]);
+  }, [referenceElRef, refs, update, currentTooltip]);
 
   const ready = x != null && y != null;
-  const Component = rendered.data?.contentAsChild ? Slot : m.div;
+  const Component = currentTooltip?.contentAsChild ? Slot : m.div;
   const resolvedSide = getResolvedSide(context.placement);
 
   return (
     <AnimatePresence mode="wait">
-      {rendered.data && ready && (
-        <TooltipPortal>
+      {currentTooltip && ready && (
+        <TooltipPortal key={currentTooltip.id}>
           <div
             ref={refs.setFloating}
             data-slot="tooltip-overlay"
             data-side={resolvedSide}
-            data-align={rendered.data.align}
-            data-state={rendered.open ? "open" : "closed"}
+            data-align={currentTooltip.align}
+            data-state="open"
             style={{
               position: strategy,
               top: 0,
@@ -282,26 +270,23 @@ function TooltipOverlay() {
               <RenderedTooltipProvider
                 value={{
                   side: resolvedSide,
-                  align: rendered.data.align,
-                  open: rendered.open,
+                  align: currentTooltip.align,
+                  open: true,
                 }}
               >
                 <Component
                   data-slot="tooltip-content"
                   data-side={resolvedSide}
-                  data-align={rendered.data.align}
-                  data-state={rendered.open ? "open" : "closed"}
+                  data-align={currentTooltip.align}
+                  data-state="open"
                   initial={{ opacity: 0 }}
-                  animate={rendered.open ? { opacity: 1 } : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onAnimationComplete={() => {
-                    if (!rendered.open) setRendered({ data: null, open: false });
-                  }}
                   transition={transition}
-                  {...rendered.data.contentProps}
+                  {...currentTooltip.contentProps}
                   style={{
                     position: "relative",
-                    ...rendered.data.contentProps?.style,
+                    ...currentTooltip.contentProps?.style,
                   }}
                 />
               </RenderedTooltipProvider>
@@ -475,7 +460,7 @@ function TooltipTrigger({
     [hideTooltip, onMouseLeave],
   );
 
-  const handleFocus = React.useCallback(
+  const showTooltipOnFocus = React.useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
       onFocus?.(e);
       if (suppressNextFocusRef.current) return;
@@ -484,7 +469,7 @@ function TooltipTrigger({
     [handleOpen, onFocus],
   );
 
-  const handleBlur = React.useCallback(
+  const hideTooltipOnBlur = React.useCallback(
     (e: React.FocusEvent<HTMLDivElement>) => {
       onBlur?.(e);
       hideTooltip();
@@ -500,8 +485,8 @@ function TooltipTrigger({
       onPointerDown={handlePointerDown}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
-      onFocus={handleFocus}
-      onBlur={handleBlur}
+      onFocus={showTooltipOnFocus}
+      onBlur={hideTooltipOnBlur}
       data-slot="tooltip-trigger"
       data-side={side}
       data-align={align}

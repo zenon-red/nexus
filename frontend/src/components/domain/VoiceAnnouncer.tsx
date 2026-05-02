@@ -80,10 +80,7 @@ function isAllowedAudioUrl(url: string): boolean {
   }
 }
 
-export function VoiceAnnouncer({
-  onStateChange,
-  onLevelsChange,
-}: VoiceAnnouncerProps) {
+export function VoiceAnnouncer({ onStateChange, onLevelsChange }: VoiceAnnouncerProps) {
   const announcements = useVoiceAnnouncements();
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(loadAutoplayBlocked);
@@ -263,7 +260,14 @@ export function VoiceAnnouncer({
       hasNextAnnouncement: !!nextAnnouncement,
       levels: levelsRef.current,
     });
-  }, [isPlaying, autoplayBlocked, onStateChange, handleEnableVoice, handlePauseVoice, nextAnnouncement]);
+  }, [
+    isPlaying,
+    autoplayBlocked,
+    onStateChange,
+    handleEnableVoice,
+    handlePauseVoice,
+    nextAnnouncement,
+  ]);
 
   return null;
 }
