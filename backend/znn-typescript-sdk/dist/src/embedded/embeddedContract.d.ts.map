@@ -1,0 +1,1 @@
+{"version":3,"file":"embeddedContract.d.ts","sourceRoot":"","sources":["../../../src/embedded/embeddedContract.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,GAAG,EAAE,MAAM,eAAe,CAAC;AAEpC,8BAAsB,gBAAgB;IAClC,SAAS,CAAC,MAAM,CAAC,QAAQ,CAAC,UAAU,EAAE,MAAM,CAAC;IAC7C,OAAO,CAAC,MAAM,CAAC,SAAS,CAA0B;IAElD,MAAM,KAAK,GAAG,IAAI,GAAG,CAQpB;CACJ"}

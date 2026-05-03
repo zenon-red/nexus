@@ -1,0 +1,42 @@
+import { Api } from "../base.js";
+import { Address, Hash, TokenStandard } from "../../model/primitives/index.js";
+import { BridgeInfo, OrchestratorInfo, BridgeNetworkInfo, BridgeNetworkInfoList, WrapTokenRequest, WrapTokenRequestList, UnwrapTokenRequest, UnwrapTokenRequestList, ZtsFeesInfo, TimeChallengesList, SecurityInfo } from "../../model/embedded/index.js";
+import { AccountBlockTemplate } from "../../model/nom/accountBlock.js";
+export declare class BridgeApi extends Api {
+    getBridgeInfo(): Promise<BridgeInfo>;
+    getOrchestratorInfo(): Promise<OrchestratorInfo>;
+    getNetworkInfo(networkClass: number, chainId: number): Promise<BridgeNetworkInfo>;
+    getAllNetworks(pageIndex?: number, pageSize?: number): Promise<BridgeNetworkInfoList>;
+    getWrapTokenRequestById(id: Hash): Promise<WrapTokenRequest>;
+    getAllWrapTokenRequests(pageIndex?: number, pageSize?: number): Promise<WrapTokenRequestList>;
+    getAllWrapTokenRequestsByToAddress(toAddress: string, pageIndex?: number, pageSize?: number): Promise<WrapTokenRequestList>;
+    getAllWrapTokenRequestsByToAddressNetworkClassAndChainId(toAddress: string, networkClass: number, chainId: number, pageIndex?: number, pageSize?: number): Promise<WrapTokenRequestList>;
+    getAllUnsignedWrapTokenRequests(pageIndex?: number, pageSize?: number): Promise<WrapTokenRequestList>;
+    getUnwrapTokenRequestByHashAndLog(txHash: Hash, logIndex: number): Promise<UnwrapTokenRequest>;
+    getAllUnwrapTokenRequests(pageIndex?: number, pageSize?: number): Promise<UnwrapTokenRequestList>;
+    getAllUnwrapTokenRequestsByToAddress(toAddress: string, pageIndex?: number, pageSize?: number): Promise<UnwrapTokenRequestList>;
+    getFeeTokenPair(zts: TokenStandard): Promise<ZtsFeesInfo>;
+    getSecurityInfo(): Promise<SecurityInfo>;
+    getTimeChallengesInfo(): Promise<TimeChallengesList>;
+    wrapToken(networkClass: number, chainId: number, toAddress: string, amount: BigNumber, tokenStandard: TokenStandard): AccountBlockTemplate;
+    updateWrapRequest(id: Hash, signature: string): AccountBlockTemplate;
+    halt(signature: string): AccountBlockTemplate;
+    changeTssECDSAPubKey(pubKey: string, oldPubKeySignature: string, newPubKeySignature: string): AccountBlockTemplate;
+    redeem(transactionHash: Hash, logIndex: number): AccountBlockTemplate;
+    unwrapToken(networkClass: number, chainId: number, transactionHash: Hash, logIndex: number, toAddress: Address, tokenAddress: string, amount: BigNumber, signature: string): AccountBlockTemplate;
+    proposeAdministrator(address: Address): AccountBlockTemplate;
+    setNetwork(networkClass: number, chainId: number, name: string, contractAddress: string, metadata: string): AccountBlockTemplate;
+    removeNetwork(networkClass: number, chainId: number): AccountBlockTemplate;
+    setTokenPair(networkClass: number, chainId: number, tokenStandard: TokenStandard, tokenAddress: string, bridgeable: boolean, redeemable: boolean, owned: boolean, minAmount: BigNumber, feePercentage: number, redeemDelay: number, metadata: string): AccountBlockTemplate;
+    setNetworkMetadata(networkClass: number, chainId: number, metadata: string): AccountBlockTemplate;
+    removeTokenPair(networkClass: number, chainId: number, tokenStandard: TokenStandard, tokenAddress: string): AccountBlockTemplate;
+    unhalt(): AccountBlockTemplate;
+    emergency(): AccountBlockTemplate;
+    changeAdministrator(administrator: Address): AccountBlockTemplate;
+    setAllowKeyGen(allowKeyGen: boolean): AccountBlockTemplate;
+    setBridgeMetadata(metadata: string): AccountBlockTemplate;
+    revokeUnwrapRequest(transactionHash: Hash, logIndex: number): AccountBlockTemplate;
+    nominateGuardians(guardians: Address[]): AccountBlockTemplate;
+    setOrchestratorInfo(windowSize: number, keyGenThreshold: number, confirmationsToFinality: number, estimatedMomentumTime: number): AccountBlockTemplate;
+}
+//# sourceMappingURL=bridge.d.ts.map

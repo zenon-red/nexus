@@ -1,6 +1,7 @@
 # generated
 node_modules/
 dist/
+!backend/znn-typescript-sdk/dist/
 build/
 .output/
 stdb/target/

@@ -1,0 +1,1 @@
+{"version":3,"file":"derivation.js","sourceRoot":"","sources":["../../src/wallet/derivation.ts"],"names":[],"mappings":";AAAA,MAAM,OAAO,UAAU;IAIZ,MAAM,CAAC,oBAAoB,CAAC,UAAkB,CAAC;QAClD,OAAO,EAAU,CAAC,cAAc,GAAG,IAAI,OAAO,GAAG,CAAC;IACtD,CAAC;;;AALM,mBAAQ,GAAW,OAAO,AAAlB,CAAmB;AAC3B,yBAAc,GAAW,SAAS,EAAI,CAAC,QAAQ,GAAG,AAApC,CAAqC"}
