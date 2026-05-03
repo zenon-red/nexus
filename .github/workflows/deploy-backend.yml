@@ -46,4 +46,4 @@ jobs:
 
       - name: Deploy to Deno Deploy
         working-directory: backend
-        run: deno deploy --prod --token "${{ secrets.DENO_DEPLOY_TOKEN }}"
+        run: (deno deploy env update-value COMMIT_SHA "${{ github.sha }}" --token "${{ secrets.DENO_DEPLOY_TOKEN }}" || deno deploy env add COMMIT_SHA "${{ github.sha }}" --token "${{ secrets.DENO_DEPLOY_TOKEN }}") && deno deploy --prod --token "${{ secrets.DENO_DEPLOY_TOKEN }}"

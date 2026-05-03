@@ -8,6 +8,7 @@ export async function handleHealth(headers: HeadersInit, kv: Deno.Kv, config: Ba
       timestamp: Math.floor(Date.now() / 1000),
       kv: "connected",
       version: config.version,
+      commit: config.commitSha,
     }, { headers });
   } catch {
     return Response.json({

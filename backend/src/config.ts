@@ -18,6 +18,7 @@ export interface BackendConfig {
   rateLimitWindow: number;
   trustProxy: boolean;
   corsOrigin: string;
+  commitSha: string;
   version: string;
   walletSignatureGrant: string;
 }
@@ -45,6 +46,7 @@ export function loadConfig(): BackendConfig {
     rateLimitWindow: parseEnvInt("RATE_LIMIT_WINDOW", "60"),
     trustProxy: Deno.env.get("TRUST_PROXY") === "true",
     corsOrigin: Deno.env.get("CORS_ORIGIN") || "*",
+    commitSha: Deno.env.get("COMMIT_SHA") || "unknown",
     version: denoJson.version ?? "0.0.0",
     walletSignatureGrant: WALLET_SIGNATURE_GRANT,
   };
