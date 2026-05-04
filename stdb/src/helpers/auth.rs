@@ -4,9 +4,9 @@ use crate::tables::identity_role::{IdentityRole, identity_roles};
 use crate::types::AgentRole;
 
 const ZOE_IDENTITIES: &[&str] = &[
-    "c20042e1bccdf9eeddb52cf0d58d99e8c31eeba188fd98bc91c206f86b3b8955",
-    "c200c7d4c23d986d28a5f033f523a9b79eb4b8472df63cff2998518d27bdd0ba",
-    "c200c62241c00a10307076de3ea76a8e4a45aa916e9ace64325ef2221faa9522",
+    "c2007f3e7f1528db3acb1c1236748351a914678b4f25b852371b61b12d993e33", // local dev
+    "c20023937920a7aaa1328048dde87b2b9293e6676375202ae3d4c22bd75daea1", // self-hosted
+    "c200c62241c00a10307076de3ea76a8e4a45aa916e9ace64325ef2221faa9522", // cloud
 ];
 
 pub fn is_zoe_identity(identity: &Identity) -> bool {
