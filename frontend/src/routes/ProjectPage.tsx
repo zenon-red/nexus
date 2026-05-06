@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams, useNavigate, Link } from "react-router";
 import { m, AnimatePresence, type Transition } from "motion/react";
-import {
-  ArrowLeft,
-  Github,
-  MessageSquare,
-  CircleDot,
-  GitPullRequest,
-  Lightbulb,
-} from "lucide-react";
+import { ArrowLeft, MessageSquare, CircleDot, GitPullRequest, Lightbulb } from "lucide-react";
+import { Icon } from "@iconify/react";
 import { AppShell } from "@/components/layout";
 import { useProject } from "@/hooks/useProject";
 import { AlienAvatar } from "@zenon-red/alien-avatars-react";
@@ -542,7 +536,7 @@ export function ProjectPage() {
                         rel="noopener noreferrer"
                         className="flex items-center gap-1.5 transition-colors hover:text-primary"
                       >
-                        <Github className="h-3.5 w-3.5" />
+                        <Icon icon="octicon:mark-github-24" className="h-5.5 w-5.5" />
                         <span className="hidden sm:inline">{normalizedRepo.path}</span>
                       </a>
                     </>

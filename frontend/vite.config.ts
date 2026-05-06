@@ -14,9 +14,9 @@ export default defineConfig({
     target: 'esnext',
     rollupOptions: {
       output: {
-        manualChunks: {
-          spacetime: ['spacetimedb'],
-          react: ['react', 'react-dom'],
+        manualChunks(id) {
+          if (id.includes('node_modules/spacetimedb')) return 'spacetime';
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) return 'react';
         },
       },
     },

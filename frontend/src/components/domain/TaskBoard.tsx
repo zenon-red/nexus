@@ -25,7 +25,8 @@ import {
   AccordionContent,
 } from "@/components/animate-ui/components/radix/accordion";
 import { AlienAvatar } from "@zenon-red/alien-avatars-react";
-import { CircleDot, Github, GitPullRequest } from "lucide-react";
+import { CircleDot, GitPullRequest } from "lucide-react";
+import { Icon } from "@iconify/react";
 
 const getPathAnimate = (isChecked: boolean) => ({
   pathLength: isChecked ? 1 : 0,
@@ -441,7 +442,7 @@ export function TaskBoard({ className, maxItems = 50, showInnerTexture = false }
                             </span>
                             {group.project?.githubRepo && (
                               <div className="flex items-center gap-1 font-mono text-tiny text-primary">
-                                <Github className="size-3 shrink-0" />
+                                <Icon icon="octicon:mark-github-24" className="size-3 shrink-0" />
                                 <span>
                                   {group.project.githubRepo
                                     .replace("github.com/", "")
