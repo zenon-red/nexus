@@ -1,0 +1,33 @@
+frontend/tsconfig.json
+  81d41b4a9ea34007 19
+frontend/vite.config.ts
+  81d41b4a9ea34007 17-19
+frontend/package.json
+  81d41b4a9ea34007 25,27,31-32,37,39,42
+frontend/src/components/domain/TaskBoard.tsx
+  81d41b4a9ea34007 28-29,445
+.github/workflows/deploy-backend.yml
+  81d41b4a9ea34007 31
+.github/workflows/ci.yml
+  81d41b4a9ea34007 51
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "41f8416031256c29a8abf46cb94537cad59e23a3",
+  "prompts": {
+    "81d41b4a9ea34007": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_207394180ffe3byHbSmWDly5Vy",
+        "model": "opencode-go/deepseek-v4-pro"
+      },
+      "human_author": "ZŌE",
+      "messages": [],
+      "total_additions": 19,
+      "total_deletions": 16,
+      "accepted_lines": 17,
+      "overriden_lines": 0
+    }
+  }
+}
