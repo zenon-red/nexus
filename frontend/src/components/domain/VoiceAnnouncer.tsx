@@ -1,5 +1,10 @@
-import { useEffect, useRef, useState, useCallback } from "react";
-import { useVoiceAnnouncements, AnnouncementStatusEnum } from "@/spacetime/hooks";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import {
+  useVoiceAnnouncements,
+  AnnouncementStatusEnum,
+  useAgents,
+  AgentRoleEnum,
+} from "@/spacetime/hooks";
 import type { VoiceAnnouncement } from "@/spacetime/generated/types";
 
 const PLAYED_STORAGE_KEY = "nexus.voice.played";
@@ -82,6 +87,16 @@ function isAllowedAudioUrl(url: string): boolean {
 
 export function VoiceAnnouncer({ onStateChange, onLevelsChange }: VoiceAnnouncerProps) {
   const announcements = useVoiceAnnouncements();
+  const agents = useAgents();
+  const zoeIdentitySet = useMemo(
+    () =>
+      new Set(
+        agents
+          .filter((a) => AgentRoleEnum.is.zoe(a.role))
+          .map((a) => a.identity.toHexString().toLowerCase()),
+      ),
+    [agents],
+  );
   const [isPlaying, setIsPlaying] = useState(false);
   const [autoplayBlocked, setAutoplayBlocked] = useState(loadAutoplayBlocked);
   const [canAutoPlay, setCanAutoPlay] = useState(true);
@@ -108,7 +123,7 @@ export function VoiceAnnouncer({ onStateChange, onLevelsChange }: VoiceAnnouncer
   const eligibleAnnouncements = announcements
     .filter(
       (a) =>
-        a.agentName === "zoe" &&
+        zoeIdentitySet.has(a.agentId.toHexString().toLowerCase()) &&
         AnnouncementStatusEnum.is.ready(a.status) &&
         isAllowedAudioUrl(a.audioUrl) &&
         !playedRef.current.has(announcementKey(a)),
