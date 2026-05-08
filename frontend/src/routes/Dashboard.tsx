@@ -123,28 +123,29 @@ export function Dashboard() {
                 <div className="relative z-10 flex h-full items-end justify-center">
                   <TalkingHead showWordmark />
                 </div>
-                {voiceState?.autoplayBlocked && (
-                  <button
-                    type="button"
-                    onClick={() => voiceState.enableVoice()}
-                    className="absolute bottom-3 left-3 z-20 inline-flex items-center gap-1.5 rounded-md border border-border bg-slate-950 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-slate-950/80"
-                  >
-                    <Play className="size-3.5" />
-                    Enable Voice
-                  </button>
-                )}
+              </div>
+              <div className="relative mx-auto flex h-[62vh] max-h-[62vh] min-h-85 w-full max-w-2xl flex-col lg:h-auto lg:max-h-none lg:min-h-0 lg:flex-1">
                 {voiceState?.isPlaying && (
                   <button
                     type="button"
                     onClick={() => voiceState.pauseVoice()}
-                    className="absolute bottom-3 left-3 z-20 inline-flex h-8 w-8 items-center justify-center rounded-md border border-border bg-slate-950 text-foreground transition-colors hover:bg-slate-950/80"
+                    className="absolute -top-10 left-0 z-30 inline-flex items-center gap-1.5 rounded-md bg-red-900 px-4 py-2 text-xs font-semibold text-white shadow-lg transition-colors hover:bg-red-800"
                     aria-label="Pause voice"
                   >
-                    <Pause className="size-3.5" />
+                    <Pause className="size-4" />
+                    Pause Voice
                   </button>
                 )}
-              </div>
-              <div className="flex h-[62vh] max-h-[62vh] min-h-85 flex-col lg:h-auto lg:max-h-none lg:min-h-0 lg:flex-1">
+                {!voiceState?.isPlaying && voiceState?.autoplayBlocked && (
+                  <button
+                    type="button"
+                    onClick={() => voiceState.enableVoice()}
+                    className="absolute -top-10 left-0 z-30 inline-flex items-center gap-1.5 rounded-md bg-red-900 px-4 py-2 text-xs font-semibold text-white shadow-lg transition-colors hover:bg-red-800"
+                  >
+                    <Play className="size-4" />
+                    Enable Voice
+                  </button>
+                )}
                 <MessageFeed className="h-full" onActiveChannelChange={setActiveChatChannel} />
               </div>
             </m.div>

@@ -452,45 +452,43 @@ function IdeaPageView({
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.05 }}
-              className="rounded-md bg-surface text-left font-mono"
+              className="grid grid-cols-2 gap-3 sm:grid-cols-4"
             >
-              <div className="grid grid-cols-4 gap-4">
-                <div className="rounded-md bg-surface-elevated/20">
-                  <div className="text-center text-tiny tracking-wider text-muted-foreground uppercase">
-                    score
-                  </div>
-                  <div
-                    className={cn(
-                      "mt-1 text-center text-sm font-semibold",
-                      getScoreTextClass(idea.computedScore),
-                    )}
-                  >
-                    {idea.computedScore.toFixed(1)}
-                  </div>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-surface-elevated/40 p-3">
+                <div className="text-center text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                  Score
                 </div>
-                <div className="rounded-md bg-surface-elevated/20">
-                  <div className="text-center text-tiny tracking-wider text-muted-foreground uppercase">
-                    participation
-                  </div>
-                  <div className="mt-1 text-center text-sm font-semibold text-foreground">
-                    {idea.totalVotes}/{activeAgentCount}
-                  </div>
+                <div
+                  className={cn(
+                    "mt-1 text-center text-xl font-bold tabular-nums",
+                    getScoreTextClass(idea.computedScore),
+                  )}
+                >
+                  {idea.computedScore.toFixed(1)}
                 </div>
-                <div className="rounded-md bg-surface-elevated/20">
-                  <div className="text-center text-tiny tracking-wider text-muted-foreground uppercase">
-                    approval
-                  </div>
-                  <div className="mt-1 text-center text-sm font-semibold text-foreground">
-                    ≥ 7.0
-                  </div>
+              </div>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-surface-elevated/40 p-3">
+                <div className="text-center text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                  Participation
                 </div>
-                <div className="rounded-md bg-surface-elevated/20">
-                  <div className="text-center text-tiny tracking-wider text-muted-foreground uppercase">
-                    veto limit
-                  </div>
-                  <div className="mt-1 text-center text-sm font-semibold text-foreground">
-                    {idea.vetoThreshold}
-                  </div>
+                <div className="mt-1 text-center text-xl font-bold text-foreground tabular-nums">
+                  {idea.totalVotes}/{activeAgentCount}
+                </div>
+              </div>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-surface-elevated/40 p-3">
+                <div className="text-center text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                  Approval
+                </div>
+                <div className="mt-1 text-center text-xl font-bold text-foreground tabular-nums">
+                  ≥ 7.0
+                </div>
+              </div>
+              <div className="flex flex-col items-center justify-center rounded-lg border border-border/40 bg-surface-elevated/40 p-3">
+                <div className="text-center text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
+                  Veto Limit
+                </div>
+                <div className="mt-1 text-center text-xl font-bold text-foreground tabular-nums">
+                  {idea.vetoThreshold}
                 </div>
               </div>
             </m.section>

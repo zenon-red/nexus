@@ -126,7 +126,6 @@ function MessageFeedSkeleton() {
 const channelColors = [
   { text: "text-primary" },
   { text: "text-info" },
-  { text: "text-purple" },
   { text: "text-accent" },
   { text: "text-success" },
   { text: "text-warning" },
@@ -164,7 +163,7 @@ function ChannelSwitcher({
   };
 
   return (
-    <div className="shrink-0 border-t border-white/10 bg-gradient-to-r from-slate-900/50 via-slate-900 to-slate-900/50">
+    <div className="shrink-0 border-white/80 bg-zinc-800">
       <div
         ref={scrollRef}
         onWheel={handleWheel}
@@ -185,8 +184,8 @@ function ChannelSwitcher({
                 "h-9 cursor-pointer px-4 font-mono text-xs font-medium whitespace-nowrap transition-colors duration-150",
                 !isLast && "border-r border-white/10",
                 isActive
-                  ? cn("bg-slate-900/85", colors.text, "font-semibold")
-                  : cn("text-slate-300 hover:bg-slate-900/45 hover:text-slate-100"),
+                  ? cn("bg-zinc-950/95", colors.text, "font-semibold")
+                  : cn("text-slate-200 hover:bg-zinc-950/85 hover:text-slate-100"),
               )}
             >
               #{channel.name}
@@ -210,11 +209,36 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
   const parentRef = useRef<HTMLDivElement>(null);
   const [visibleCount, setVisibleCount] = useState(MESSAGES_PER_PAGE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const prevMessagesLength = useRef(0);
   const loadMoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const shouldStickToBottomRef = useRef(true);
+  const initialScrollScheduledRef = useRef(false);
+  const initialScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [activeChannel, setActiveChannel] = useState("general");
-  const [dismissedDirectiveId, setDismissedDirectiveId] = useState<string | null>(null);
+
+  // Per-channel directive dismissal persisted to localStorage
+  const [dismissedDirectives, setDismissedDirectives] = useState<Record<string, string>>(() => {
+    try {
+      const raw = localStorage.getItem("nexus:dismissed-directives");
+      return raw ? (JSON.parse(raw) as Record<string, string>) : {};
+    } catch {
+      return {};
+    }
+  });
+  const dismissDirective = useCallback(
+    (channelIdStr: string, directiveId: string | null) => {
+      if (!directiveId) return;
+      const map = { ...dismissedDirectives };
+      map[channelIdStr] = directiveId;
+      setDismissedDirectives(map);
+      try {
+        localStorage.setItem("nexus:dismissed-directives", JSON.stringify(map));
+      } catch {
+        // ignore quota errors
+      }
+    },
+    [dismissedDirectives],
+  );
+
   const isInitialLoading =
     (!messagesReady && messages.length === 0) || (!channelsReady && channels.length === 0);
 
@@ -262,7 +286,9 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
   }, [messages, channelId]);
 
   const latestDirectiveId = latestChannelDirective ? latestChannelDirective.id.toString() : null;
-  const isDirectiveDismissed = !!latestDirectiveId && dismissedDirectiveId === latestDirectiveId;
+  const channelIdStr = channelId.toString();
+  const isDirectiveDismissed =
+    !!latestDirectiveId && dismissedDirectives[channelIdStr] === latestDirectiveId;
 
   const visibleMessages = useMemo(() => {
     return filteredMessages.slice(-visibleCount);
@@ -275,17 +301,6 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
     overscan: 5,
     measureElement: (el) => el.getBoundingClientRect().height,
   });
-
-  const scrollToBottom = useCallback(() => {
-    if (!parentRef.current) return;
-    const scrollElement = parentRef.current;
-    scrollElement.scrollTop = scrollElement.scrollHeight;
-  }, []);
-
-  const syncScrollToBottom = useCallback(() => {
-    scrollToBottom();
-    requestAnimationFrame(scrollToBottom);
-  }, [scrollToBottom]);
 
   const handleScroll = useCallback(() => {
     if (!parentRef.current || isLoadingMore) return;
@@ -325,39 +340,66 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
   }, []);
 
   useEffect(() => {
-    setVisibleCount(MESSAGES_PER_PAGE);
-    prevMessagesLength.current = 0;
-    shouldStickToBottomRef.current = true;
-    requestAnimationFrame(syncScrollToBottom);
-  }, [channelId, syncScrollToBottom]);
+    return () => {
+      if (initialScrollTimeoutRef.current) {
+        clearTimeout(initialScrollTimeoutRef.current);
+        initialScrollTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
+  // Initial load scroll — uses a ref-guarded timeout so re-renders
+  // (from SpacetimeDB streaming data) don't cancel it via effect cleanup.
   useEffect(() => {
-    const currentLength = filteredMessages.length;
+    if (isInitialLoading) return;
+    if (visibleMessages.length === 0) return;
+    if (initialScrollScheduledRef.current) return;
 
-    if (currentLength > prevMessagesLength.current && shouldStickToBottomRef.current) {
-      requestAnimationFrame(syncScrollToBottom);
+    initialScrollScheduledRef.current = true;
+    shouldStickToBottomRef.current = true;
+
+    if (initialScrollTimeoutRef.current) {
+      clearTimeout(initialScrollTimeoutRef.current);
     }
 
-    prevMessagesLength.current = currentLength;
-  }, [filteredMessages.length, syncScrollToBottom]);
+    initialScrollTimeoutRef.current = setTimeout(() => {
+      initialScrollTimeoutRef.current = null;
+      if (!parentRef.current) return;
+      if (!shouldStickToBottomRef.current) return;
+      parentRef.current.scrollTop = parentRef.current.scrollHeight;
+    }, 100);
+    // Intentionally no cleanup — we only want to cancel when a new timeout
+    // is explicitly scheduled above, not when React re-runs this effect.
+  }, [isInitialLoading, visibleMessages.length]);
 
+  // New messages scroll — immediate, only when user is already at bottom
   useLayoutEffect(() => {
+    if (isInitialLoading) return;
+    if (visibleMessages.length === 0) return;
     if (!shouldStickToBottomRef.current) return;
-    syncScrollToBottom();
-  }, [visibleMessages.length, syncScrollToBottom]);
+    if (!parentRef.current) return;
+    if (!initialScrollScheduledRef.current) return;
+
+    parentRef.current.scrollTop = parentRef.current.scrollHeight;
+  }, [filteredMessages.length, channelId]);
 
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
     <div
       className={cn(
-        "relative mx-auto flex h-[85vh] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-border bg-gradient-to-br from-chat-bg-light via-chat-bg-mid to-chat-bg-dark shadow-2xl sm:w-[95%]",
+        "relative flex h-[85vh] w-full flex-col overflow-hidden bg-linear-to-br from-chat-bg-light via-chat-bg-mid to-chat-bg-dark shadow-2xl",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_30%_20%,var(--color-chat-highlight-soft)_0%,transparent_52%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_70%_38%,var(--color-chat-mid-soft)_0%,transparent_52%)]" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_25%,var(--color-chat-highlight-soft)_0%,transparent_22%)]" />
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_56%_92%,var(--color-chat-shadow-soft)_0%,transparent_46%)]" />
+
+      <ChannelSwitcher
+        value={activeChannel}
+        onValueChange={handleChannelChange}
+        channels={channels}
+      />
 
       <m.div
         initial={{ opacity: 0, scale: 0.98 }}
@@ -368,12 +410,12 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
         <div
           ref={parentRef}
           onScroll={handleScroll}
-          className="scrollbar-thin scrollbar-track-transparent relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto [scrollbar-color:oklch(0.58_0.02_260)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:!bg-slate-500/35 hover:[&::-webkit-scrollbar-thumb]:!bg-slate-500/50"
+          className="scrollbar-thin scrollbar-track-transparent relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto [scrollbar-color:oklch(0.58_0.02_260)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/35! hover:[&::-webkit-scrollbar-thumb]:bg-slate-500/50!"
         >
           {latestChannelDirective && !isDirectiveDismissed && (
             <div className="sticky top-0 z-20 px-5 pt-4 pb-3">
               <ElectricBorder
-                className="overflow-visible rounded-2xl"
+                className="overflow-visible rounded-md"
                 color="oklch(0.7 0.1 220)"
                 speed={0.6}
                 chaos={0.07}
@@ -382,7 +424,7 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
                 <div className="relative rounded-[inherit] bg-surface/92 px-6 py-6">
                   <button
                     type="button"
-                    onClick={() => setDismissedDirectiveId(latestDirectiveId)}
+                    onClick={() => dismissDirective(channelIdStr, latestDirectiveId)}
                     className="absolute top-3 right-4 z-30 cursor-pointer font-mono text-xl leading-none text-slate-300 transition-colors hover:text-white"
                     aria-label="Dismiss directive"
                     title="Dismiss"
@@ -468,14 +510,8 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
             </div>
           )}
         </div>
-        <div className="pointer-events-none absolute top-0 right-0 left-0 z-10 h-12 bg-gradient-to-b from-chat-bg-light via-chat-bg-light/80 to-transparent" />
+        <div className="pointer-events-none absolute top-0 right-0 left-0 z-10 h-12 bg-linear-to-b from-chat-bg-light via-chat-bg-light/80 to-transparent" />
       </m.div>
-
-      <ChannelSwitcher
-        value={activeChannel}
-        onValueChange={handleChannelChange}
-        channels={channels}
-      />
     </div>
   );
 }
