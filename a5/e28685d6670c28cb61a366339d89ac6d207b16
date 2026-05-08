@@ -1,0 +1,56 @@
+frontend/src/routes/IdeaPage.tsx
+  s_bd4fc040f0b209::t_cf16fcdc336d9c 455,457-459,461-467,469-472,475-481,483-489,491
+frontend/src/routes/Dashboard.tsx
+  s_93a30c6e5e2707::t_b241a0a21d5777 126-127,136
+  s_93a30c6e5e2707::t_7c8bc0afbcad3d 139
+  s_bd4fc040f0b209::t_2459439aa8e156 142,145-146
+  s_93a30c6e5e2707::t_7d453555e6690d 132,143
+  s_bd4fc040f0b209::t_dc0c07aa279569 135
+frontend/src/components/domain/MessageFeed.tsx
+  s_b5b21ce3741624::t_f416ef40ba6010 289-290
+  s_b5b21ce3741624::t_6cbdddcd74eda1 217-218,227-229,231,233-237,241
+  s_b5b21ce3741624::t_af4eb4d5ac2eaf 363,382
+  s_b5b21ce3741624::t_40bb20466c4802 368
+  s_b5b21ce3741624::t_048c0ac8767d21 369-370
+  s_b5b21ce3741624::t_b6c9daa2f6d29d 398-403
+  s_b5b21ce3741624::t_a2155bb9aee0e1 427
+  s_b5b21ce3741624::t_91068c5a6b0d14 343-349
+  s_93a30c6e5e2707::t_ce9c0c1faef4a5 219-226,230,232,238,240,291
+  s_b5b21ce3741624::t_d9007569fbb27e 214-215
+  s_bd4fc040f0b209::t_d4b0d5e750212c 391
+  s_b5b21ce3741624::t_b3cae78ba0aa2a 351-352,354-356,358-359,361-362,365-367,371-375,377-378,380-381,383-384
+frontend/src/index.css
+  s_bd4fc040f0b209::t_0d2bb22ae2d13d 8,14,17,31-33,44-46,287,289,291,295,297,302-303,310,314,316,321,323,325,329,331,336-337,344,348,350
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "a5e28685d6670c28cb61a366339d89ac6d207b16",
+  "prompts": {},
+  "sessions": {
+    "s_93a30c6e5e2707": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1f658942dffeE75NyOcYb5q1F6",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "ZŌE <zoe@zenon.red>"
+    },
+    "s_b5b21ce3741624": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1f8b17166ffeSyIOY4cI02ybTz",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "ZŌE <zoe@zenon.red>"
+    },
+    "s_bd4fc040f0b209": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1f6af87b1ffeUHthZhdulrrlKj",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "ZŌE <zoe@zenon.red>"
+    }
+  }
+}
