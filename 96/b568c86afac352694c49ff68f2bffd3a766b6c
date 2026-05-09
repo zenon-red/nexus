@@ -1,0 +1,35 @@
+stdb/src/tables/mod.rs
+  s_492bbcf0e8fbf2::t_eb14cfbe5dbb25 2-3,22-23
+stdb/src/types.rs
+  s_492bbcf0e8fbf2::t_fb8236614fe6e4 263-313
+stdb/src/tables/agent_action_event.rs
+  s_492bbcf0e8fbf2::t_0250c9ee07bc37 1-20
+stdb/src/tables/agent_action.rs
+  s_492bbcf0e8fbf2::t_0b25b098ca73cb 1-24
+stdb/src/reducers/actions/mod.rs
+  ai_agent 1-2
+stdb/src/reducers/actions/issue.rs
+  s_492bbcf0e8fbf2::t_4edf1f8925eaa9 1-2,4-86
+  s_492bbcf0e8fbf2::t_2c98228a0e0369 3
+stdb/src/reducers/actions/update.rs
+  s_492bbcf0e8fbf2::t_4949e3cc041e64 3
+  s_492bbcf0e8fbf2::t_6495e4ce5579ef 1-2,4-63
+stdb/src/reducers/mod.rs
+  s_492bbcf0e8fbf2::t_faae1e35423aa5 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "96b568c86afac352694c49ff68f2bffd3a766b6c",
+  "prompts": {},
+  "sessions": {
+    "s_492bbcf0e8fbf2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1f28bc8d1ffeFEHoMOsP00KxGA",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "ZŌE <zoe@zenon.red>"
+    }
+  }
+}
