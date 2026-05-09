@@ -1,0 +1,48 @@
+stdb/src/reducers/actions/mod.rs
+  ai_agent 2
+frontend/src/spacetime/generated/issue_agent_action_reducer.ts
+  ai_agent 1-25
+frontend/src/spacetime/generated/types/reducers.ts
+  ai_agent 17,27,42,52
+stdb/src/tables/agent_action.rs
+  ai_agent 8,23
+stdb/src/reducers/actions/issue.rs
+  ai_agent 1,38-40,85
+frontend/src/spacetime/generated/agent_action_events_table.ts
+  ai_agent 1-27
+frontend/src/components/domain/MessageFeed.tsx
+  s_e2c9bce0379e73::t_1f91307a4bb904 381,395
+  s_e2c9bce0379e73::t_bd8564fde84156 166
+  s_e2c9bce0379e73::t_3182b17ded573a 400
+  s_e2c9bce0379e73::t_3f50a5dea42872 81
+  s_e2c9bce0379e73::t_f27e38ed99d9a6 185
+  s_e2c9bce0379e73::t_6ec1fefe93f241 184
+frontend/src/spacetime/generated/update_agent_action_reducer.ts
+  ai_agent 1-24
+stdb/src/tables/agent_action_event.rs
+  ai_agent 8,21
+frontend/src/spacetime/generated/agent_actions_table.ts
+  ai_agent 1-32
+frontend/src/spacetime/generated/types.ts
+  ai_agent 13-48,69-97
+stdb/src/reducers/actions/update.rs
+  ai_agent 63
+frontend/src/spacetime/generated/index.ts
+  ai_agent 4,45,55,66-67,88-121,365,375,391,408-409
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "caa7683f240e794ab606015285110a7013547e3b",
+  "prompts": {},
+  "sessions": {
+    "s_e2c9bce0379e73": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1f10c1f3cffehJGVfHSIc1FQNM",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "ZŌE <zoe@zenon.red>"
+    }
+  }
+}
