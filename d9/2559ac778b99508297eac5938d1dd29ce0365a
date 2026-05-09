@@ -1,0 +1,48 @@
+stdb/src/tables/mod.rs
+  s_492bbcf0e8fbf2::t_eb14cfbe5dbb25 2-3,22-23
+stdb/src/reducers/actions/update.rs
+  s_492bbcf0e8fbf2::t_4949e3cc041e64 3
+  s_492bbcf0e8fbf2::t_6495e4ce5579ef 1-2,4-62
+stdb/src/reducers/actions/issue.rs
+  s_492bbcf0e8fbf2::t_4edf1f8925eaa9 2,4-84
+  s_492bbcf0e8fbf2::t_2c98228a0e0369 3
+stdb/src/tables/agent_action.rs
+  s_492bbcf0e8fbf2::t_0b25b098ca73cb 1-22
+stdb/src/tables/agent_action_event.rs
+  s_492bbcf0e8fbf2::t_0250c9ee07bc37 1-20
+frontend/src/components/domain/MessageFeed.tsx
+  s_e2c9bce0379e73::t_bd8564fde84156 166
+  s_e2c9bce0379e73::t_3f50a5dea42872 81
+  s_e2c9bce0379e73::t_6ec1fefe93f241 184
+  s_e2c9bce0379e73::t_1f91307a4bb904 381,395
+  s_e2c9bce0379e73::t_f27e38ed99d9a6 185
+  s_e2c9bce0379e73::t_3182b17ded573a 400
+stdb/src/reducers/mod.rs
+  s_492bbcf0e8fbf2::t_faae1e35423aa5 1
+stdb/src/types.rs
+  s_492bbcf0e8fbf2::t_fb8236614fe6e4 263-313
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.4",
+  "base_commit_sha": "d92559ac778b99508297eac5938d1dd29ce0365a",
+  "prompts": {},
+  "sessions": {
+    "s_492bbcf0e8fbf2": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1f28bc8d1ffeFEHoMOsP00KxGA",
+        "model": "gpt-5.3-codex"
+      },
+      "human_author": "ZŌE <zoe@zenon.red>"
+    },
+    "s_e2c9bce0379e73": {
+      "agent_id": {
+        "tool": "opencode",
+        "id": "ses_1f10c1f3cffehJGVfHSIc1FQNM",
+        "model": "deepseek-v4-pro"
+      },
+      "human_author": "ZŌE <zoe@zenon.red>"
+    }
+  }
+}
