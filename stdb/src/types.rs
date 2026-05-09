@@ -260,3 +260,54 @@ pub enum DiscoveryDecision {
     Reject,
     EscalateToIdea,
 }
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum ActionKind {
+    Repair,
+    Inbox,
+    Vote,
+    Propose,
+    ContinueTask,
+    ClaimTask,
+    ProjectSetup,
+    CreateTasks,
+    ValidateReviews,
+    ReviewDiscovery,
+    Idle,
+}
+
+impl ActionKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ActionKind::Repair => "repair",
+            ActionKind::Inbox => "inbox",
+            ActionKind::Vote => "vote",
+            ActionKind::Propose => "propose",
+            ActionKind::ContinueTask => "continue_task",
+            ActionKind::ClaimTask => "claim_task",
+            ActionKind::ProjectSetup => "project_setup",
+            ActionKind::CreateTasks => "create_tasks",
+            ActionKind::ValidateReviews => "validate_reviews",
+            ActionKind::ReviewDiscovery => "review_discovery",
+            ActionKind::Idle => "idle",
+        }
+    }
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum ActionStatus {
+    Issued,
+    Completed,
+    Skipped,
+    Failed,
+    Expired,
+}
+
+#[derive(SpacetimeType, Clone, Debug, PartialEq, Eq)]
+pub enum ActionEventType {
+    Issued,
+    Completed,
+    Skipped,
+    Failed,
+    Expired,
+}

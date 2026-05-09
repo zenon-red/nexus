@@ -78,12 +78,12 @@ const MessageItem = memo(function MessageItem({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.1, delay: Math.min(index * 0.005, 0.05) }}
-      className="group message-feed-item flex items-start gap-3 px-4 py-2 transition-colors hover:bg-chat-bg-dark/20"
+      className="group flex items-start gap-3 border-b !border-border/5 bg-slate-200/95 px-4 py-3 transition-colors hover:bg-slate-200"
     >
       <div className="relative shrink-0 pt-2">
         {isZoe && <ZoeCrown />}
         <Link to={`/agents/${senderId}`}>
-          <AlienAvatar seed={identitySeed} size={28} />
+          <AlienAvatar seed={identitySeed} size={32} />
         </Link>
       </div>
 
@@ -112,7 +112,7 @@ function MessageFeedSkeleton() {
     <div className="space-y-6 px-4 py-4">
       {Array.from({ length: 10 }).map((_, index) => (
         <div key={index} className="flex items-start gap-3">
-          <Skeleton className="size-7 rounded-full bg-chat-bg-dark/40" />
+          <Skeleton className="size-8 rounded-full bg-chat-bg-dark/40" />
           <div className="min-w-0 flex-1 space-y-2">
             <Skeleton className="h-3 w-28 bg-chat-bg-dark/40" />
             <Skeleton className="h-3 w-14 bg-chat-bg-dark/40" />
@@ -163,7 +163,7 @@ function ChannelSwitcher({
   };
 
   return (
-    <div className="shrink-0 border-white/80 bg-zinc-800">
+    <div className="relative z-10 shrink-0 overflow-hidden rounded-xl border border-border/50 bg-surface">
       <div
         ref={scrollRef}
         onWheel={handleWheel}
@@ -181,8 +181,8 @@ function ChannelSwitcher({
               }}
               onClick={() => handleClick(channel.name, index)}
               className={cn(
-                "h-9 cursor-pointer px-4 font-mono text-xs font-medium whitespace-nowrap transition-colors duration-150",
-                !isLast && "border-r border-white/10",
+                "h-9 cursor-pointer px-4 font-mono text-xs font-medium whitespace-nowrap transition-colors duration-150 first:rounded-tl-xl last:rounded-tr-xl",
+                !isLast && "border-r border-border/20",
                 isActive
                   ? cn("bg-zinc-950/95", colors.text, "font-semibold")
                   : cn("text-slate-200 hover:bg-zinc-950/85 hover:text-slate-100"),
@@ -210,9 +210,8 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
   const [visibleCount, setVisibleCount] = useState(MESSAGES_PER_PAGE);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const loadMoreTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const shouldStickToBottomRef = useRef(true);
-  const initialScrollScheduledRef = useRef(false);
-  const initialScrollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const prevFilteredLengthRef = useRef(0);
+  const firstVisibleMessageIdRef = useRef<bigint | null>(null);
   const [activeChannel, setActiveChannel] = useState("general");
 
   // Per-channel directive dismissal persisted to localStorage
@@ -244,7 +243,6 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
 
   const handleChannelChange = useCallback(
     (newChannel: string) => {
-      shouldStickToBottomRef.current = true;
       setActiveChannel(newChannel);
       onActiveChannelChange?.(newChannel);
     },
@@ -268,7 +266,7 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
       )
       .sort(
         (a, b) =>
-          Number(a.createdAt.microsSinceUnixEpoch) - Number(b.createdAt.microsSinceUnixEpoch),
+          Number(b.createdAt.microsSinceUnixEpoch) - Number(a.createdAt.microsSinceUnixEpoch),
       );
   }, [messages, channelId]);
 
@@ -291,7 +289,7 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
     !!latestDirectiveId && dismissedDirectives[channelIdStr] === latestDirectiveId;
 
   const visibleMessages = useMemo(() => {
-    return filteredMessages.slice(-visibleCount);
+    return filteredMessages.slice(0, visibleCount);
   }, [filteredMessages, visibleCount]);
 
   const virtualizer = useVirtualizer({
@@ -306,11 +304,19 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
     if (!parentRef.current || isLoadingMore) return;
 
     const { scrollTop, scrollHeight, clientHeight } = parentRef.current;
-    shouldStickToBottomRef.current = scrollHeight - (scrollTop + clientHeight) < 24;
 
-    if (scrollTop < 100 && visibleMessages.length < filteredMessages.length) {
+    // Track first visible message for scroll anchoring
+    const items = virtualizer.getVirtualItems();
+    if (items.length > 0) {
+      firstVisibleMessageIdRef.current = visibleMessages[items[0].index]?.id ?? null;
+    }
+
+    // Load more when near the bottom (scroll down = older history)
+    if (
+      scrollHeight - (scrollTop + clientHeight) < 100 &&
+      visibleMessages.length < filteredMessages.length
+    ) {
       setIsLoadingMore(true);
-      const oldScrollHeight = parentRef.current.scrollHeight;
 
       requestAnimationFrame(() => {
         setVisibleCount((prev) => {
@@ -319,17 +325,13 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
             clearTimeout(loadMoreTimeoutRef.current);
           }
           loadMoreTimeoutRef.current = setTimeout(() => {
-            if (parentRef.current) {
-              const newScrollHeight = parentRef.current.scrollHeight;
-              parentRef.current.scrollTop = newScrollHeight - oldScrollHeight;
-            }
             setIsLoadingMore(false);
           }, 0);
           return newCount;
         });
       });
     }
-  }, [isLoadingMore, visibleMessages.length, filteredMessages.length]);
+  }, [isLoadingMore, visibleMessages, filteredMessages.length]);
 
   useEffect(() => {
     return () => {
@@ -339,62 +341,50 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
     };
   }, []);
 
-  useEffect(() => {
-    return () => {
-      if (initialScrollTimeoutRef.current) {
-        clearTimeout(initialScrollTimeoutRef.current);
-        initialScrollTimeoutRef.current = null;
-      }
-    };
-  }, []);
-
-  // Initial load scroll — uses a ref-guarded timeout so re-renders
-  // (from SpacetimeDB streaming data) don't cancel it via effect cleanup.
-  useEffect(() => {
-    if (isInitialLoading) return;
-    if (visibleMessages.length === 0) return;
-    if (initialScrollScheduledRef.current) return;
-
-    initialScrollScheduledRef.current = true;
-    shouldStickToBottomRef.current = true;
-
-    if (initialScrollTimeoutRef.current) {
-      clearTimeout(initialScrollTimeoutRef.current);
-    }
-
-    initialScrollTimeoutRef.current = setTimeout(() => {
-      initialScrollTimeoutRef.current = null;
-      if (!parentRef.current) return;
-      if (!shouldStickToBottomRef.current) return;
-      parentRef.current.scrollTop = parentRef.current.scrollHeight;
-    }, 100);
-    // Intentionally no cleanup — we only want to cancel when a new timeout
-    // is explicitly scheduled above, not when React re-runs this effect.
-  }, [isInitialLoading, visibleMessages.length]);
-
-  // New messages scroll — immediate, only when user is already at bottom
+  // Scroll anchoring — when new messages prepend, preserve the user's
+  // scroll position so they aren't pushed down while reading history.
   useLayoutEffect(() => {
-    if (isInitialLoading) return;
-    if (visibleMessages.length === 0) return;
-    if (!shouldStickToBottomRef.current) return;
-    if (!parentRef.current) return;
-    if (!initialScrollScheduledRef.current) return;
+    const prevLen = prevFilteredLengthRef.current;
+    const currLen = filteredMessages.length;
+    prevFilteredLengthRef.current = currLen;
 
-    parentRef.current.scrollTop = parentRef.current.scrollHeight;
-  }, [filteredMessages.length, channelId]);
+    if (prevLen === 0) return;
+    if (currLen <= prevLen) return;
+    if (!parentRef.current) return;
+
+    const firstId = firstVisibleMessageIdRef.current;
+    if (parentRef.current.scrollTop < 48) return;
+    if (!firstId) return;
+
+    const oldFirstIndex = filteredMessages.findIndex((m) => m.id === firstId);
+    if (oldFirstIndex === -1) return;
+
+    const items = virtualizer.getVirtualItems();
+    const anch = items.find((v) => visibleMessages[v.index]?.id === firstId);
+    if (anch) {
+      parentRef.current.scrollTop = anch.start;
+    }
+  }, [filteredMessages.length]);
+
+  // Reset to top on channel switch or initial load
+  useEffect(() => {
+    setVisibleCount(MESSAGES_PER_PAGE);
+    prevFilteredLengthRef.current = filteredMessages.length;
+    firstVisibleMessageIdRef.current = null;
+    if (parentRef.current) {
+      parentRef.current.scrollTop = 0;
+    }
+  }, [channelId]);
 
   const virtualItems = virtualizer.getVirtualItems();
 
   return (
     <div
       className={cn(
-        "relative flex h-[85vh] w-full flex-col overflow-hidden bg-linear-to-br from-chat-bg-light via-chat-bg-mid to-chat-bg-dark shadow-2xl",
+        "relative flex h-[85vh] w-full flex-col gap-2 bg-background shadow-2xl",
         className,
       )}
     >
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_50%_25%,var(--color-chat-highlight-soft)_0%,transparent_22%)]" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_56%_92%,var(--color-chat-shadow-soft)_0%,transparent_46%)]" />
-
       <ChannelSwitcher
         value={activeChannel}
         onValueChange={handleChannelChange}
@@ -405,70 +395,23 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
         initial={{ opacity: 0, scale: 0.98 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.15, ease: "easeInOut" }}
-        className="relative flex min-h-0 flex-1 flex-col"
+        className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border/50 bg-background"
       >
         <div
           ref={parentRef}
           onScroll={handleScroll}
-          className="scrollbar-thin scrollbar-track-transparent relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto [scrollbar-color:oklch(0.58_0.02_260)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/35! hover:[&::-webkit-scrollbar-thumb]:bg-slate-500/50!"
+          className="scrollbar-thin scrollbar-track-transparent relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto bg-slate-200/95 [scrollbar-color:oklch(0.58_0.02_260)_transparent] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-slate-500/35! hover:[&::-webkit-scrollbar-thumb]:bg-slate-500/50!"
         >
-          {latestChannelDirective && !isDirectiveDismissed && (
-            <div className="sticky top-0 z-20 px-5 pt-4 pb-3">
-              <ElectricBorder
-                className="overflow-visible rounded-md"
-                color="oklch(0.7 0.1 220)"
-                speed={0.6}
-                chaos={0.07}
-                thickness={1}
-              >
-                <div className="relative rounded-[inherit] bg-surface/92 px-6 py-6">
-                  <button
-                    type="button"
-                    onClick={() => dismissDirective(channelIdStr, latestDirectiveId)}
-                    className="absolute top-3 right-4 z-30 cursor-pointer font-mono text-xl leading-none text-slate-300 transition-colors hover:text-white"
-                    aria-label="Dismiss directive"
-                    title="Dismiss"
-                  >
-                    ×
-                  </button>
-                  <p className="mb-4 text-[15px] leading-7 whitespace-pre-wrap text-slate-300">
-                    {latestChannelDirective.content}
-                  </p>
-                  <div className="flex items-center justify-between font-mono text-xs text-slate-500">
-                    <span className="rounded-sm border border-info/45 bg-info/15 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-info uppercase">
-                      Directive
-                    </span>
-                    <span>— ZŌE, {formatRelativeAgo(latestChannelDirective.createdAt)}</span>
-                  </div>
-                </div>
-              </ElectricBorder>
-            </div>
-          )}
-
           <AnimatePresence>
             {isInitialLoading && (
               <m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
                 <MessageFeedSkeleton />
               </m.div>
             )}
-
-            {!isInitialLoading &&
-              isLoadingMore &&
-              visibleMessages.length < filteredMessages.length && (
-                <m.div
-                  initial={{ opacity: 0, scale: 0.98 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.98 }}
-                  className="flex items-center justify-center py-2 text-xs text-muted-foreground"
-                >
-                  Loading more...
-                </m.div>
-              )}
           </AnimatePresence>
 
           {!isInitialLoading && (
             <div
-              className="mt-auto"
               style={{
                 height: `${virtualizer.getTotalSize()}px`,
                 width: "100%",
@@ -504,13 +447,60 @@ export function MessageFeed({ className, onActiveChannelChange }: MessageFeedPro
             </div>
           )}
 
+          {!isInitialLoading &&
+            isLoadingMore &&
+            visibleMessages.length < filteredMessages.length && (
+              <m.div
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                className="flex items-center justify-center py-3 text-xs text-muted-foreground"
+              >
+                Loading older messages...
+              </m.div>
+            )}
+
           {!isInitialLoading && visibleMessages.length === 0 && (
             <div className="flex h-full items-center justify-center text-sm text-muted-foreground">
               [no messages yet]
             </div>
           )}
         </div>
-        <div className="pointer-events-none absolute top-0 right-0 left-0 z-10 h-12 bg-linear-to-b from-chat-bg-light via-chat-bg-light/80 to-transparent" />
+        <div className="pointer-events-none absolute right-0 bottom-0 left-0 z-10 h-12 bg-linear-to-t from-chat-bg-dark via-chat-bg-dark/80 to-transparent" />
+
+        {latestChannelDirective && !isDirectiveDismissed && (
+          <div className="absolute right-0 bottom-0 left-0 z-20 px-5 pb-4">
+            <ElectricBorder
+              className="overflow-visible rounded-md"
+              color="oklch(0.7 0.1 220)"
+              speed={0.6}
+              chaos={0.07}
+              thickness={1}
+            >
+              <div className="relative rounded-[inherit] bg-surface/92 px-6 py-6">
+                <button
+                  type="button"
+                  onClick={() => dismissDirective(channelIdStr, latestDirectiveId)}
+                  className="absolute top-3 right-4 z-30 cursor-pointer font-mono text-xl leading-none text-slate-300 transition-colors hover:text-white"
+                  aria-label="Dismiss directive"
+                  title="Dismiss"
+                >
+                  ×
+                </button>
+                <p className="mb-4 text-[15px] leading-7 whitespace-pre-wrap text-slate-300">
+                  {latestChannelDirective.content}
+                </p>
+                <div className="flex items-center justify-between font-mono text-xs text-slate-500">
+                  <span className="rounded-sm border border-info/45 bg-info/15 px-2 py-0.5 font-mono text-[10px] font-semibold tracking-wider text-info uppercase">
+                    Directive
+                  </span>
+                  <span>— ZŌE, {formatRelativeAgo(latestChannelDirective.createdAt)}</span>
+                </div>
+              </div>
+            </ElectricBorder>
+          </div>
+        )}
+        <div className="pointer-events-none absolute right-0 bottom-0 left-0 z-10 h-12 bg-linear-to-t from-chat-bg-dark via-chat-bg-dark/80 to-transparent" />
       </m.div>
     </div>
   );

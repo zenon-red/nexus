@@ -1,4 +1,6 @@
 pub mod agent;
+pub mod agent_action;
+pub mod agent_action_event;
 pub mod agent_voice_counter;
 pub mod channel;
 pub mod config;
@@ -17,6 +19,8 @@ pub mod voice_announcement;
 pub mod voice_allowed_host;
 
 pub use agent::Agent;
+pub use agent_action::AgentAction;
+pub use agent_action_event::AgentActionEvent;
 pub use agent_voice_counter::AgentVoiceCounter;
 pub use channel::Channel;
 pub use config::Config;
