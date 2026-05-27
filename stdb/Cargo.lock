@@ -622,9 +622,9 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "spacetimedb"
-version = "2.1.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "591f9068644aab6808e7612a869dedde7eeb26df78027a19bc9dc597cc649678"
+checksum = "62aa9a940d32178e4afa7a14c9bbda76685d71d5487798905e0139b807182092"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -645,9 +645,9 @@ dependencies = [
 
 [[package]]
 name = "spacetimedb-bindings-macro"
-version = "2.1.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72f68bf4810d838be622c13efd4cd64e0a9ce8cd340deaa730f0c92caee845f9"
+checksum = "5feb5d55f04f3209764d9b94949226708a4a8578e92ac5c32abfd31dbdfc928c"
 dependencies = [
  "heck 0.4.1",
  "humantime",
@@ -659,18 +659,18 @@ dependencies = [
 
 [[package]]
 name = "spacetimedb-bindings-sys"
-version = "2.1.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c2fe9f4124a599c9deae8f8231be3ae5a49bc5b2eef5e04c04b2632cf4cc0b4"
+checksum = "28f9c900c9371fd7e84d34b8cb2bf90562060dc2473ae9c44e970d4026e7d7d9"
 dependencies = [
  "spacetimedb-primitives",
 ]
 
 [[package]]
 name = "spacetimedb-lib"
-version = "2.1.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "672c0dd16feced67155a0dee7bd38d30f7725321c8177cb871a21c3d8749ae97"
+checksum = "a15a98adf6f030e8188df4b038e140a54771e6eeb50ad05a6c3e46939b8de853"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -689,9 +689,9 @@ dependencies = [
 
 [[package]]
 name = "spacetimedb-primitives"
-version = "2.1.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dba5d7497d54aa8d4254f78a0bef12606bb05e62f8dea8b69abc9b241508e8b7"
+checksum = "b20cc4bf97377f1dce9e75b2f6ce94bc5c7c2a243040a7a2016ac5cdb002793d"
 dependencies = [
  "bitflags",
  "either",
@@ -702,18 +702,18 @@ dependencies = [
 
 [[package]]
 name = "spacetimedb-query-builder"
-version = "2.1.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d04c6e41e05273f14405ac6f429477626677d46528b561a509b7b78b45128f30"
+checksum = "afa17878dbc23b4bfc06a45165c7afd34c8d29bba6dfde81625840c11380abce"
 dependencies = [
  "spacetimedb-lib",
 ]
 
 [[package]]
 name = "spacetimedb-sats"
-version = "2.1.0"
+version = "2.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfde33ec86d80881da8b00c42096bf0382bef8e1bc35e9b6faaa42d77cbf503c"
+checksum = "74216db354eab5cefad9572a350654761495968478e83e51ef2c530cdf6cb1d4"
 dependencies = [
  "anyhow",
  "arrayvec",
