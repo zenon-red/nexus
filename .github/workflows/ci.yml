@@ -20,7 +20,7 @@ jobs:
       VITE_SPACETIME_MODULE: ${{ vars.VITE_SPACETIME_MODULE }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -41,7 +41,7 @@ jobs:
         working-directory: backend
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - uses: denoland/setup-deno@v2.0.3
         with:
@@ -72,7 +72,7 @@ jobs:
         working-directory: stdb
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v6.0.3
 
       - uses: dtolnay/rust-toolchain@stable
 
