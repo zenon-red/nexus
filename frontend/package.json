@@ -15,7 +15,7 @@
     "types": "spacetime generate --lang typescript --out-dir src/spacetime/generated --module-path \"$PWD/../stdb\" -y"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.4.2",
+    "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^20.4.2",
     "@tailwindcss/vite": "^4.2.1",
     "@types/node": "^25.3.0",
