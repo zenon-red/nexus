@@ -12,7 +12,7 @@ jobs:
   stale:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/stale@v10.2.0
+      - uses: actions/stale@v10.4.0
         with:
           stale-issue-message: ''
           stale-pr-message: ''
